@@ -66,10 +66,13 @@
             android:paddingBottom="12dp">
 
             <LinearLayout
+                android:id="@+id/group_switch_container"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -84,7 +87,7 @@
                     android:layout_height="wrap_content"
                     android:text="丁班"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <ImageView

@@ -2,13 +2,17 @@ package com.example.myapplication;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ArrayAdapter;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,7 +22,10 @@ import com.example.myapplication.data.ShiftCalendarUtil;
 import com.example.myapplication.data.ShiftDay;
 import com.example.myapplication.data.ShiftRule;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 
 public class CalendarFragment extends Fragment {
@@ -77,11 +84,9 @@ public class CalendarFragment extends Fragment {
 
         TextView groupName = view.findViewById(R.id.group_name);
         groupName.setText(shiftRule.getName());
-        groupName.setOnClickListener(v -> {
-            Intent intent = new Intent(getActivity(), RuleDetailActivity.class);
-            intent.putExtra("rule", shiftRule);
-            startActivity(intent);
-        });
+        
+        View groupSwitchContainer = view.findViewById(R.id.group_switch_container);
+        groupSwitchContainer.setOnClickListener(v -> showGroupPopup());
 
         view.findViewById(R.id.group_statistics).setOnClickListener(v -> {
             Toast.makeText(getContext(), "统计功能开发中", Toast.LENGTH_SHORT).show();
@@ -134,6 +139,11 @@ public class CalendarFragment extends Fragment {
             selectedYear = lastSelectedDay.getYear();
             selectedMonth = lastSelectedDay.getMonth();
             selectedDay = lastSelectedDay.getDay();
+        } else {
+            // 如果没有保存的选中日期，默认选中今天
+            selectedYear = todayYear;
+            selectedMonth = todayMonth;
+            selectedDay = today.get(Calendar.DAY_OF_MONTH);
         }
 
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
@@ -236,14 +246,6 @@ public class CalendarFragment extends Fragment {
                 // 检查是否是当前选中的日期
                 boolean isSelected = false;
                 if (selectedYear == day.getYear() && selectedMonth == day.getMonth() && selectedDay == day.getDay()) {
-                    isSelected = true;
-                }
-                // 如果没有保存的选中日期，默认选中今天
-                if (lastSelectedDay == null && isToday) {
-                    isSelected = true;
-                }
-                // 如果没有今天也没有保存的选中日期，默认选中1号
-                if (lastSelectedDay == null && !isToday && day.getDay() == 1 && isCurrentMonth) {
                     isSelected = true;
                 }
 
@@ -350,6 +352,105 @@ public class CalendarFragment extends Fragment {
         }
     }
 
+    private void showGroupPopup() {
+        String[] allGroups = {"甲班", "乙班", "丙班", "丁班"};
+        String currentGroup = shiftRule.getName();
+        
+        List<String> groupList = new ArrayList<>();
+        groupList.add(currentGroup);
+        for (String group : allGroups) {
+            if (!group.equals(currentGroup)) {
+                groupList.add(group);
+            }
+        }
+        
+        final String[] groupsArray = groupList.toArray(new String[0]);
+        final int currentGroupPosition = 0;
+        
+        View popupView = LayoutInflater.from(getContext()).inflate(R.layout.item_group_spinner, null);
+        ListView listView = new ListView(getContext());
+        listView.setDivider(null);
+        listView.setDividerHeight(0);
+        listView.setBackgroundColor(getResources().getColor(android.R.color.white));
+        
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+            getContext(),
+            R.layout.item_group_spinner,
+            android.R.id.text1,
+            groupsArray
+        ) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                TextView textView = view.findViewById(android.R.id.text1);
+                if (position == currentGroupPosition) {
+                    textView.setTextColor(getResources().getColor(R.color.primary));
+                } else {
+                    textView.setTextColor(getResources().getColor(android.R.color.black));
+                }
+                return view;
+            }
+        };
+        listView.setAdapter(adapter);
+        
+        // 精确测量2个汉字宽度，并增加0.5倍
+        TextView tempText = new TextView(getContext());
+        tempText.setText("丁班");
+        tempText.setTextSize(16);
+        tempText.setPadding(12, 12, 12, 12);
+        int widthSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        tempText.measure(widthSpec, heightSpec);
+        int textWidth = tempText.getMeasuredWidth();
+        // 在现有宽度基础上增加0.3倍
+        int finalWidth = (int) (textWidth * 1.3);
+        // 打印宽度信息
+        Toast.makeText(getContext(), "原始宽度: " + textWidth + "px, 最终宽度: " + finalWidth + "px", Toast.LENGTH_SHORT).show();
+        
+        final PopupWindow popupWindow = new PopupWindow(
+            listView,
+            finalWidth,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        );
+        popupWindow.setBackgroundDrawable(getResources().getDrawable(android.R.drawable.screen_background_light));
+        
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            String selectedGroup = groupsArray[position];
+            if (!selectedGroup.equals(currentGroup)) {
+                shiftRule = createRuleForGroup(selectedGroup);
+                TextView groupName = getView().findViewById(R.id.group_name);
+                groupName.setText(selectedGroup);
+                updateCalendar(getView());
+            }
+            popupWindow.dismiss();
+        });
+        
+        View groupNameView = getView().findViewById(R.id.group_name);
+        int[] location = new int[2];
+        groupNameView.getLocationOnScreen(location);
+        popupWindow.showAtLocation(groupNameView, Gravity.NO_GRAVITY, location[0], location[1] + groupNameView.getHeight());
+    }
+    
+    private ShiftRule createRuleForGroup(String groupName) {
+        ShiftRule rule = new ShiftRule();
+        rule.setName(groupName);
+        rule.setCompanyName("武钢二热轧");
+        rule.setTag("");
+        rule.setCycleDays(4);
+        rule.setGroupCount(4);
+        rule.setDefault(groupName.equals("丁班"));
+
+        List<ShiftRule.ShiftDetail> details = new ArrayList<>();
+        details.add(new ShiftRule.ShiftDetail(1, ShiftCalendarUtil.SHIFT_WHITE, "08:00到20:00"));
+        details.add(new ShiftRule.ShiftDetail(2, ShiftCalendarUtil.SHIFT_NIGHT, "20:00到23:59"));
+        details.add(new ShiftRule.ShiftDetail(3, ShiftCalendarUtil.SHIFT_EVENING, "00:00到08:00"));
+        details.add(new ShiftRule.ShiftDetail(4, ShiftCalendarUtil.SHIFT_REST, "00:00到23:59"));
+        rule.setShiftDetails(details);
+
+        return rule;
+    }
+    
     private void showDatePickerDialog() {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(getContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_date_picker, null);
