@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#1E90FF</color>
+    <color name="primary_dark">#1E90FF</color>
+    <color name="secondary">#32CD32</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="text_primary">#333333</color>
+    <color name="text_secondary">#666666</color>
+    <color name="text_hint">#999999</color>
+    <color name="background">#F5F5F5</color>
+    <color name="card">#FFFFFF</color>
+    <color name="border">#E0E0E0</color>
+    <color name="shift_white">#008000</color>
+    <color name="shift_night">#0066CC</color>
+    <color name="shift_evening">#FF8C00</color>
+    <color name="shift_rest">#FF6B6B</color>
+    <color name="holiday">#FF4444</color>
+    <color name="divider">#D0D0D0</color>
+</resources>

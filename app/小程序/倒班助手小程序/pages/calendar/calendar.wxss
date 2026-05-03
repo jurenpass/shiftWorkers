@@ -1,0 +1,284 @@
+/* calendar styles */
+.calendar-page {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #1E88E5;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+
+
+.calendar-select {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* 班组选择菜单 */
+.team-menu {
+  position: absolute;
+  top: 60px;
+  left: 16px;
+  right: 16px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.team-menu-item {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #333333;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.team-menu-item:last-child {
+  border-bottom: none;
+}
+
+.team-menu-item:hover {
+  background-color: #f5f5f5;
+}
+
+.team-menu-item.selected {
+  background-color: #E3F2FD;
+  color: #1E88E5;
+  font-weight: bold;
+}
+
+.calendar-month {
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* 日期选择器样式 */
+.date-picker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.date-picker-content {
+  background-color: #ffffff;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 400px;
+  overflow: hidden;
+}
+
+.date-picker-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: center;
+  font-weight: bold;
+}
+
+.date-picker-body {
+  display: flex;
+  height: 200px;
+  position: relative;
+}
+
+.date-picker-body::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 40px;
+  margin-top: -20px;
+  border-top: 1px solid #1E88E5;
+  border-bottom: 1px solid #1E88E5;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.date-picker-column {
+  flex: 1;
+  overflow-y: auto;
+  text-align: center;
+  height: 100%;
+}
+
+.date-picker-item {
+  padding: 12px 0;
+  font-size: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.date-picker-item.selected {
+  color: #1E88E5;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.date-picker-footer {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.date-picker-confirm {
+  background-color: #1E88E5;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 4px;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.calendar-weekdays {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.calendar-weekday {
+  width: 14.28%;
+  text-align: center;
+  font-size: 12px;
+  color: #666666;
+  font-weight: bold;
+}
+
+.calendar-days {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.calendar-day {
+  width: 14.28%;
+  height: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border: 1px solid #e0e0e0;
+  box-sizing: border-box;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.day-lunar {
+  font-size: 10px;
+  color: #999999;
+  margin-bottom: 2px;
+}
+
+.day-shift {
+  font-size: 10px;
+  color: #666666;
+  text-align: center;
+  padding: 2px 4px;
+  border-radius: 2px;
+  background-color: #f5f5f5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90%;
+}
+
+
+
+/* selected day styles */
+.calendar-day.selected {
+  border: 2px solid #1E88E5;
+  background-color: #ffffff;
+  box-sizing: border-box;
+}
+
+/* today styles */
+.calendar-day.today {
+  background-color: #E3F2FD;
+  color: #1E88E5;
+  font-weight: bold;
+}
+
+/* other month styles */
+.calendar-day.other-month {
+  opacity: 0.7;
+  color: #999999;
+}
+
+.calendar-day.other-month .day-number {
+  color: #999999;
+}
+
+.calendar-day.other-month .day-lunar {
+  color: #BBBBBB;
+}
+
+.calendar-day.other-month .day-shift {
+  opacity: 0.8;
+}
+
+/* shift color styles */
+.day-shift.shift-1 {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.day-shift.shift-2 {
+  background-color: #FF9800;
+  color: white;
+}
+
+.day-shift.shift-3 {
+  background-color: #9C27B0;
+  color: white;
+}
+
+.day-shift.shift-4 {
+  background-color: #9E9E9E;
+  color: white;
+}
+
+/* detail section styles */
+.calendar-detail {
+  padding: 12px;
+  background-color: #1E88E5;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.detail-item {
+  padding: 4px 0;
+}
+
+.detail-label {
+  margin-right: 8px;
+}
+
+.detail-value {
+  font-weight: bold;
+}

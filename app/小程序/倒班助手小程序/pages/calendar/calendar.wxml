@@ -1,0 +1,63 @@
+<view class="calendar-page">
+  <!-- 顶部导航 -->
+  <view class="calendar-top">
+    <view class="calendar-top-left">
+      <view class="calendar-select" bindtap="showTeamMenu">
+        <text>班组切换：{{currentTeam}}</text>
+        <text style="margin-left: 8px;">▼</text>
+      </view>
+    </view>
+    <picker mode="date" value="{{selectedDate}}" start="2020-01-01" end="2050-12-31" bindchange="onDateChange">
+      <view class="calendar-month">
+        {{currentMonth}}
+      </view>
+    </picker>
+    <view class="calendar-top-right">
+      班组统计 ></view>
+  </view>
+  
+
+  
+  <!-- 班组选择菜单 -->
+  <view class="team-menu" wx:if="{{showTeamMenu}}">
+    <view class="team-menu-item" bindtap="selectTeam" data-team="甲班">甲班</view>
+    <view class="team-menu-item" bindtap="selectTeam" data-team="乙班">乙班</view>
+    <view class="team-menu-item" bindtap="selectTeam" data-team="丙班">丙班</view>
+    <view class="team-menu-item" bindtap="selectTeam" data-team="丁班">丁班</view>
+  </view>
+  
+  <!-- 星期标题 -->
+  <view class="calendar-weekdays">
+    <view class="calendar-weekday">一</view>
+    <view class="calendar-weekday">二</view>
+    <view class="calendar-weekday">三</view>
+    <view class="calendar-weekday">四</view>
+    <view class="calendar-weekday">五</view>
+    <view class="calendar-weekday">六</view>
+    <view class="calendar-weekday">日</view>
+  </view>
+  
+  <!-- 日历日期 -->
+  <view class="calendar-days" bindtouchstart="touchStart" bindtouchmove="touchMove" bindtouchend="touchEnd">
+    <view wx:for="{{calendarData}}" wx:key="index" class="calendar-day {{!item.isCurrentMonth ? 'other-month' : ''}} {{selectedDate == item.date ? 'selected' : ''}} {{item.isToday ? 'today' : ''}}" bindtap="selectDay" data-day="{{item.date}}" data-lunar="{{item.lunar}}">
+      <view class="day-number">{{item.day}}</view>
+      <view class="day-lunar" style="{{item.holiday ? 'color: #FF4081;' : ''}}">{{item.lunar}}</view>
+      <view class="day-shift {{item.shift == '白班' ? 'shift-1' : item.shift == '上夜班' ? 'shift-2' : item.shift == '下夜班' ? 'shift-3' : 'shift-4'}}">{{item.shift}}</view>
+    </view>
+  </view>
+  
+  <!-- 底部详细信息 -->
+  <view class="calendar-detail">
+    <view class="detail-item">
+      <text class="detail-label">日期：</text>
+      <text class="detail-value">{{selectedDateDisplay}} {{selectedWeekday}} 农历 {{selectedLunar}}</text>
+    </view>
+    <view class="detail-item">
+      <text class="detail-label">当前班次：</text>
+      <text class="detail-value">{{currentTeam}}（{{selectedShift}}）</text>
+    </view>
+    <view class="detail-item">
+      <text class="detail-value">{{otherTeamsShift}}</text>
+    </view>
+  </view>
+</view>

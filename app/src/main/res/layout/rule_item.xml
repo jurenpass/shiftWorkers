@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/day_text"
+        android:layout_width="60dp"
+        android:layout_height="wrap_content"
+        android:background="#E0E0E0"
+        android:gravity="center"
+        android:padding="8dp"
+        android:text="第1天"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/shift_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="白班"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/time_range"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="08:00到20:00"
+        android:textSize="14sp" />
+</LinearLayout>
