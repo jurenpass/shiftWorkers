@@ -73,11 +73,36 @@ public class ShiftCalendarUtil {
 
     private static final String[][] WORK_ON_WEEKEND = {
             {"01-04", "班"},
-            {"02-14", "班"},
+            {"01-14", "班"},
             {"02-28", "班"},
             {"05-09", "班"},
             {"09-20", "班"},
             {"10-10", "班"}
+    };
+
+    private static final String[][] SOLAR_TERMS_DATES = {
+            {"01-06", "小寒"}, {"01-20", "大寒"},
+            {"02-04", "立春"}, {"02-19", "雨水"},
+            {"03-06", "惊蛰"}, {"03-21", "春分"},
+            {"04-05", "清明"}, {"04-20", "谷雨"},
+            {"05-06", "立夏"}, {"05-21", "小满"},
+            {"06-06", "芒种"}, {"06-22", "夏至"},
+            {"07-07", "小暑"}, {"07-23", "大暑"},
+            {"08-08", "立秋"}, {"08-23", "处暑"},
+            {"09-08", "白露"}, {"09-23", "秋分"},
+            {"10-08", "寒露"}, {"10-24", "霜降"},
+            {"11-08", "立冬"}, {"11-22", "小雪"},
+            {"12-07", "大雪"}, {"12-22", "冬至"}
+    };
+
+    private static final String[][] LUNAR_HOLIDAYS = {
+            {"正月初一", "春节"},
+            {"正月十五", "元宵节"},
+            {"五月初五", "端午节"},
+            {"七月初七", "七夕节"},
+            {"八月十五", "中秋节"},
+            {"九月初九", "重阳节"},
+            {"腊月三十", "除夕"}
     };
 
     public static List<ShiftDay> generateMonthShiftDays(int year, int month, ShiftRule rule) {
@@ -108,10 +133,19 @@ public class ShiftCalendarUtil {
             int dayDay = current.get(Calendar.DAY_OF_MONTH);
 
             ShiftDay shiftDay = new ShiftDay(dayYear, dayMonth, dayDay, "");
-            shiftDay.setLunarDate(getLunarDate(dayYear, dayMonth, dayDay));
-            shiftDay.setLunarMonth(getLunarMonth(dayYear, dayMonth, dayDay));
-            shiftDay.setHoliday(getHoliday(dayMonth, dayDay));
+            String lunarMonth = getLunarMonth(dayYear, dayMonth, dayDay);
+            String lunarDate = getLunarDate(dayYear, dayMonth, dayDay);
+            shiftDay.setLunarDate(lunarDate);
+            shiftDay.setLunarMonth(lunarMonth);
+            
+            String holiday = getHoliday(dayMonth, dayDay);
+            if (holiday == null || holiday.isEmpty()) {
+                holiday = getLunarHoliday(lunarMonth, lunarDate);
+            }
+            shiftDay.setHoliday(holiday);
+            
             shiftDay.setHolidayMark(getHolidayMark(dayYear, dayMonth, dayDay));
+            shiftDay.setSolarTerm(getSolarTerm(dayMonth, dayDay));
             shiftDay.setShiftType(getShiftTypeForDay(rule, getDaysFromStart(current.getTime(), startDate.getTime())));
 
             days.add(shiftDay);
@@ -236,6 +270,29 @@ public class ShiftCalendarUtil {
 
     private static String getHolidayMark(int year, int month, int day) {
         return HolidayManager.getInstance().getHolidayMark(year, month, day);
+    }
+
+    private static String getSolarTerm(int month, int day) {
+        String dateStr = String.format("%02d-%02d", month, day);
+        for (String[] term : SOLAR_TERMS_DATES) {
+            if (term[0].equals(dateStr)) {
+                return term[1];
+            }
+        }
+        return null;
+    }
+
+    private static String getLunarHoliday(String lunarMonth, String lunarDate) {
+        if (lunarMonth == null || lunarDate == null || lunarMonth.isEmpty() || lunarDate.isEmpty()) {
+            return null;
+        }
+        String lunarFullDate = lunarMonth + lunarDate;
+        for (String[] holiday : LUNAR_HOLIDAYS) {
+            if (holiday[0].equals(lunarFullDate)) {
+                return holiday[1];
+            }
+        }
+        return null;
     }
 
     public static String getWeekDayString(int dayOfWeek) {

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">倒班助手</string>
+    <string name="app_name">倒班人</string>
     <string name="title_home">首页</string>
     <string name="title_calendar">倒班日历</string>
     <string name="title_alarm">倒班闹钟</string>

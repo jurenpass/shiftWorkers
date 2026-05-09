@@ -11,6 +11,7 @@ public class ShiftDay {
     private String holiday;
     private String lunarMonth;
     private String holidayMark;
+    private String solarTerm;
 
     public ShiftDay(int year, int month, int day, String shiftType) {
         this.year = year;
@@ -81,6 +82,14 @@ public class ShiftDay {
 
     public void setHolidayMark(String holidayMark) {
         this.holidayMark = holidayMark;
+    }
+
+    public String getSolarTerm() {
+        return solarTerm;
+    }
+
+    public void setSolarTerm(String solarTerm) {
+        this.solarTerm = solarTerm;
     }
 
     public Calendar toCalendar() {
