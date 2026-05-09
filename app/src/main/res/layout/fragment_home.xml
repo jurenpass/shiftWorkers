@@ -88,6 +88,7 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/today_shift"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="下夜班"
@@ -111,6 +112,7 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/work_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="00:00到08:00"

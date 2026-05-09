@@ -12,6 +12,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.myapplication.data.ShiftRule;
+import com.example.myapplication.data.ShiftCalendarUtil;
+
+import java.util.Calendar;
 
 public class HomeFragment extends Fragment {
 
@@ -19,6 +22,8 @@ public class HomeFragment extends Fragment {
     private ShiftRule shiftRule;
     private TextView groupNameView;
     private TextView companyNameView;
+    private TextView todayShiftView;
+    private TextView workTimeView;
 
     public static HomeFragment newInstance(ShiftRule rule) {
         HomeFragment fragment = new HomeFragment();
@@ -43,6 +48,8 @@ public class HomeFragment extends Fragment {
 
         groupNameView = view.findViewById(R.id.group_name);
         companyNameView = view.findViewById(R.id.company_name);
+        todayShiftView = view.findViewById(R.id.today_shift);
+        workTimeView = view.findViewById(R.id.work_time);
 
         updateRuleDisplay();
 
@@ -67,7 +74,30 @@ public class HomeFragment extends Fragment {
             if (companyNameView != null) {
                 companyNameView.setText(shiftRule.getCompanyName());
             }
+            updateTodayShift();
         }
+    }
+
+    private void updateTodayShift() {
+        if (shiftRule != null && todayShiftView != null && workTimeView != null) {
+            Calendar today = Calendar.getInstance();
+            String todayShift = ShiftCalendarUtil.getTodayShiftType(shiftRule);
+            todayShiftView.setText(todayShift);
+
+            String workTime = getWorkTime(todayShift);
+            workTimeView.setText(workTime);
+        }
+    }
+
+    private String getWorkTime(String shiftType) {
+        if (shiftRule.getShiftDetails() != null) {
+            for (ShiftRule.ShiftDetail detail : shiftRule.getShiftDetails()) {
+                if (detail.getShiftName().equals(shiftType)) {
+                    return detail.getTimeRange();
+                }
+            }
+        }
+        return "";
     }
 
     public void updateShiftRule(ShiftRule newRule) {

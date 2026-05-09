@@ -308,6 +308,27 @@ public class ShiftCalendarUtil {
         return "未知班组";
     }
 
+    public static String getTodayShiftType(ShiftRule rule) {
+        if (rule == null) {
+            return SHIFT_WHITE;
+        }
+        
+        Calendar startDate = Calendar.getInstance();
+        startDate.set(2026, 3, 26);
+        
+        int groupOffset = getGroupOffset(rule.getName());
+        startDate.add(Calendar.DAY_OF_MONTH, groupOffset);
+
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+
+        long daysFromStart = getDaysFromStart(today.getTime(), startDate.getTime());
+        return getShiftTypeForDay(rule, daysFromStart);
+    }
+
     public static ShiftRule createDefaultRule() {
         ShiftRule rule = new ShiftRule();
         rule.setName("丁班");
