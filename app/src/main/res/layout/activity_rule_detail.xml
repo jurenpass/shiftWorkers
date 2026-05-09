@@ -65,7 +65,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="公司名称:武钢二热轧"
+                    android:text="公司名称:HSM2"
                     android:textColor="#666666"
                     android:textSize="14sp" />
 

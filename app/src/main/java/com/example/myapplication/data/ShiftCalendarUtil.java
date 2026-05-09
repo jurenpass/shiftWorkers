@@ -311,7 +311,7 @@ public class ShiftCalendarUtil {
     public static ShiftRule createDefaultRule() {
         ShiftRule rule = new ShiftRule();
         rule.setName("丁班");
-        rule.setCompanyName("武钢二热轧");
+        rule.setCompanyName("HSM2");
         rule.setTag("");
         rule.setCycleDays(4);
         rule.setGroupCount(4);

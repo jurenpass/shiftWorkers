@@ -150,6 +150,14 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
         saveCurrentGroup(newRule.getName());
         rescheduleAlarms();
         updateNextAlarmNotification();
+        updateHomeFragment();
+    }
+
+    private void updateHomeFragment() {
+        Fragment currentFragment = fragmentManager.findFragmentById(R.id.fragment_container);
+        if (currentFragment instanceof HomeFragment) {
+            ((HomeFragment) currentFragment).updateShiftRule(currentRule);
+        }
     }
 
     private void initHolidayData() {

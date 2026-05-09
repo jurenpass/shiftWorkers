@@ -420,7 +420,7 @@ public class CalendarFragment extends Fragment {
     private ShiftRule createRuleForGroup(String groupName) {
         ShiftRule rule = new ShiftRule();
         rule.setName(groupName);
-        rule.setCompanyName("武钢二热轧");
+        rule.setCompanyName("HSM2");
         rule.setTag("");
         rule.setCycleDays(4);
         rule.setGroupCount(4);
