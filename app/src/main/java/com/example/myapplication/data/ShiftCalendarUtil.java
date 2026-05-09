@@ -315,6 +315,10 @@ public class ShiftCalendarUtil {
         
         Calendar startDate = Calendar.getInstance();
         startDate.set(2026, 3, 26);
+        startDate.set(Calendar.HOUR_OF_DAY, 0);
+        startDate.set(Calendar.MINUTE, 0);
+        startDate.set(Calendar.SECOND, 0);
+        startDate.set(Calendar.MILLISECOND, 0);
         
         int groupOffset = getGroupOffset(rule.getName());
         startDate.add(Calendar.DAY_OF_MONTH, groupOffset);
