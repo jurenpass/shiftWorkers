@@ -18,14 +18,18 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.widget.Toast;
 
+import com.example.myapplication.data.AlarmNotificationHelper;
+import com.example.myapplication.data.AlarmSetting;
 import com.example.myapplication.data.HolidayManager;
 import com.example.myapplication.data.HolidayUpdateService;
 import com.example.myapplication.data.ShiftRule;
 import com.example.myapplication.data.ShiftCalendarUtil;
+import com.example.myapplication.data.ShiftRuleManager;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.util.Calendar;
@@ -35,21 +39,18 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
     private BottomNavigationView bottomNavigationView;
     private FragmentManager fragmentManager;
     private ShiftRule currentRule;
+    private ShiftRuleManager ruleManager;
     private float startX, startY;
     private static final int SWIPE_THRESHOLD = 50;
     private Calendar currentCalendar = Calendar.getInstance();
-    private static final String PREFS_NAME = "shift_prefs";
-    private static final String PREF_CURRENT_GROUP = "current_group";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        loadCurrentGroup();
-        if (currentRule == null) {
-            currentRule = ShiftCalendarUtil.createDefaultRule();
-        }
+        ruleManager = ShiftRuleManager.getInstance(this);
+        loadCurrentRule();
 
         initHolidayData();
 
@@ -61,9 +62,8 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
         requestExactAlarmPermission();
         requestOverlayPermission();
         requestBackgroundActivityPermission();
-        startAlarmService();
+        startPersistentService();
         rescheduleAlarms();
-        updateNextAlarmNotification();
 
         bottomNavigationView.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
             @Override
@@ -97,16 +97,18 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
         }
     }
 
-    private void loadCurrentGroup() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String groupName = prefs.getString(PREF_CURRENT_GROUP, "丁班");
-        currentRule = ShiftCalendarUtil.createDefaultRule();
-        currentRule.setName(groupName);
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadCurrentRule();
+        CalendarWidget.updateAllWidgets(this);
     }
 
-    private void saveCurrentGroup(String groupName) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putString(PREF_CURRENT_GROUP, groupName).apply();
+    private void loadCurrentRule() {
+        currentRule = ruleManager.getCurrentRule();
+        if (currentRule == null) {
+            currentRule = ShiftCalendarUtil.createDefaultRule();
+        }
     }
 
     @Override
@@ -147,17 +149,39 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
     @Override
     public void onGroupSwitched(ShiftRule newRule) {
         currentRule = newRule;
+        if (newRule.getId() != null) {
+            ruleManager.setCurrentRuleId(newRule.getId());
+        }
+        
         saveCurrentGroup(newRule.getName());
+        
         rescheduleAlarms();
-        updateNextAlarmNotification();
-        updateHomeFragment();
+        updateFragments();
+        CalendarWidget.updateAllWidgets(this);
+    }
+    
+    private void saveCurrentGroup(String groupName) {
+        SharedPreferences prefs = getSharedPreferences("shift_prefs", MODE_PRIVATE);
+        prefs.edit().putString("current_group", groupName).apply();
+        Log.d("MainActivity", "当前班组已保存: " + groupName);
     }
 
-    private void updateHomeFragment() {
+    private void updateFragments() {
         Fragment currentFragment = fragmentManager.findFragmentById(R.id.fragment_container);
         if (currentFragment instanceof HomeFragment) {
             ((HomeFragment) currentFragment).updateShiftRule(currentRule);
+        } else if (currentFragment instanceof CalendarFragment) {
+            ((CalendarFragment) currentFragment).updateShiftRule(currentRule);
+        } else if (currentFragment instanceof ProfileFragment) {
+            ((ProfileFragment) currentFragment).updateTeamDisplay(currentRule.getName());
         }
+        
+        updateNotificationBar();
+    }
+    
+    private void updateNotificationBar() {
+        // 取消显示下一个闹钟通知
+        AlarmNotificationHelper.cancelNextAlarmNotification(this);
     }
 
     private void initHolidayData() {
@@ -182,7 +206,9 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
 
     public void setCurrentRule(ShiftRule rule) {
         this.currentRule = rule;
-        saveCurrentGroup(rule.getName());
+        if (rule.getId() != null) {
+            ruleManager.setCurrentRuleId(rule.getId());
+        }
     }
 
     public void refreshCalendar() {
@@ -229,8 +255,14 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
         }
     }
 
-    private void startAlarmService() {
-        Intent serviceIntent = new Intent(this, AlarmService.class);
+    private void startPersistentService() {
+        com.example.myapplication.data.AlarmManager alarmManager = new com.example.myapplication.data.AlarmManager(this);
+        if (!alarmManager.isAlarmServiceEnabled()) {
+            Log.d("MainActivity", "闹钟服务已关闭，不启动持久服务");
+            return;
+        }
+        
+        Intent serviceIntent = new Intent(this, PersistentAlarmService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
         } else {
@@ -241,12 +273,6 @@ public class MainActivity extends AppCompatActivity implements CalendarFragment.
     private void rescheduleAlarms() {
         com.example.myapplication.data.AlarmManager alarmManager = new com.example.myapplication.data.AlarmManager(this);
         alarmManager.scheduleAllAlarms();
-    }
-
-    private void updateNextAlarmNotification() {
-        com.example.myapplication.data.AlarmManager alarmManager = new com.example.myapplication.data.AlarmManager(this);
-        com.example.myapplication.data.AlarmSetting nextAlarm = alarmManager.getNextAlarm();
-        com.example.myapplication.data.AlarmNotificationHelper.showNextAlarmNotification(this, nextAlarm);
     }
 
     @Override

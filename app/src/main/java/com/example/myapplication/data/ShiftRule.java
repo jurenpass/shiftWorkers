@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.List;
 
 public class ShiftRule implements Serializable {
+    private String id;
     private String name;
     private String companyName;
     private String tag;
@@ -11,6 +12,19 @@ public class ShiftRule implements Serializable {
     private int groupCount;
     private List<ShiftDetail> shiftDetails;
     private boolean isDefault;
+    
+    private String defaultGroupName;
+    private String todayShift;
+    
+    private List<OtherGroup> otherGroups;
+    
+    public String getId() {
+        return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
+    }
 
     public String getName() {
         return name;
@@ -66,6 +80,58 @@ public class ShiftRule implements Serializable {
 
     public void setDefault(boolean aDefault) {
         isDefault = aDefault;
+    }
+
+    public String getDefaultGroupName() {
+        return defaultGroupName;
+    }
+
+    public void setDefaultGroupName(String defaultGroupName) {
+        this.defaultGroupName = defaultGroupName;
+    }
+
+    public String getTodayShift() {
+        return todayShift;
+    }
+
+    public void setTodayShift(String todayShift) {
+        this.todayShift = todayShift;
+    }
+
+    public List<OtherGroup> getOtherGroups() {
+        return otherGroups;
+    }
+
+    public void setOtherGroups(List<OtherGroup> otherGroups) {
+        this.otherGroups = otherGroups;
+    }
+
+    public static class OtherGroup implements Serializable {
+        private String groupName;
+        private String todayShift;
+
+        public OtherGroup() {}
+
+        public OtherGroup(String groupName, String todayShift) {
+            this.groupName = groupName;
+            this.todayShift = todayShift;
+        }
+
+        public String getGroupName() {
+            return groupName;
+        }
+
+        public void setGroupName(String groupName) {
+            this.groupName = groupName;
+        }
+
+        public String getTodayShift() {
+            return todayShift;
+        }
+
+        public void setTodayShift(String todayShift) {
+            this.todayShift = todayShift;
+        }
     }
 
     public static class ShiftDetail implements Serializable {

@@ -47,7 +47,8 @@
                 android:layout_height="wrap_content"
                 android:text="丁班"
                 android:textSize="20sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:textColor="#333333" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -173,7 +174,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="倒班规则"
+                android:text="其它工具"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp" />
         </LinearLayout>

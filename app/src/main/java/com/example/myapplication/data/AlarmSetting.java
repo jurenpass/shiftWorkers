@@ -13,6 +13,9 @@ public class AlarmSetting implements Serializable {
     private String ringtone;
     private boolean vibrate;
     private boolean fade = true;
+    private int repeatType = 0;
+    private String weekdays = "";
+    private long repeatDate = 0;
 
     public AlarmSetting() {
         this.team = "丁班";
@@ -109,6 +112,30 @@ public class AlarmSetting implements Serializable {
 
     public void setVibrate(boolean vibrate) {
         this.vibrate = vibrate;
+    }
+
+    public int getRepeatType() {
+        return repeatType;
+    }
+
+    public void setRepeatType(int repeatType) {
+        this.repeatType = repeatType;
+    }
+
+    public String getWeekdays() {
+        return weekdays;
+    }
+
+    public void setWeekdays(String weekdays) {
+        this.weekdays = weekdays;
+    }
+
+    public long getRepeatDate() {
+        return repeatDate;
+    }
+
+    public void setRepeatDate(long repeatDate) {
+        this.repeatDate = repeatDate;
     }
 
     public String getTimeString() {

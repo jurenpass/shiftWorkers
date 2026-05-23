@@ -1,27 +1,39 @@
 package com.example.myapplication;
 
+import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.NumberPicker;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.PopupWindow;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.example.myapplication.data.AlarmManager;
+import com.example.myapplication.data.AlarmSetting;
 import com.example.myapplication.data.ShiftCalendarUtil;
 import com.example.myapplication.data.ShiftDay;
 import com.example.myapplication.data.ShiftRule;
+import com.example.myapplication.data.ShiftRuleManager;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -29,6 +41,7 @@ import java.util.List;
 
 public class CalendarFragment extends Fragment {
 
+    private static final String TAG = "CalendarFragment";
     private static final String ARG_RULE = "shift_rule";
     private ShiftRule shiftRule;
     private Calendar currentCalendar;
@@ -38,6 +51,19 @@ public class CalendarFragment extends Fragment {
     private View lastSelectedView = null;
     private ShiftDay lastSelectedDay = null;
     private OnGroupSwitchListener groupSwitchListener;
+    private ShiftRuleManager ruleManager;
+    private List<ShiftRule> sameCompanyRules = new ArrayList<>();
+    
+    private java.util.Map<String, List<ShiftDay>> monthCache = new java.util.HashMap<>();
+    private BroadcastReceiver alarmChangedReceiver;
+    private long lastClickTime = 0;
+    private int holidayRestBgColor;
+    private int holidayWorkBgColor;
+    private int holidayRedColor;
+    private int textSecondaryColor;
+    private int transparentColor;
+    private int todayBgColor;
+    private int backgroundColor;
 
     public interface OnGroupSwitchListener {
         void onGroupSwitched(ShiftRule newRule);
@@ -64,7 +90,17 @@ public class CalendarFragment extends Fragment {
         if (shiftRule == null) {
             shiftRule = ShiftCalendarUtil.createDefaultRule();
         }
+        ruleManager = ShiftRuleManager.getInstance(getContext());
+        loadSameCompanyRules();
         currentCalendar = Calendar.getInstance();
+    }
+
+    private void loadSameCompanyRules() {
+        sameCompanyRules = ShiftCalendarUtil.getSameCompanyRules(getContext(), shiftRule);
+        if (sameCompanyRules.isEmpty()) {
+            ShiftRule defaultRule = ShiftCalendarUtil.createDefaultRule();
+            sameCompanyRules.add(defaultRule);
+        }
     }
 
     @Nullable
@@ -73,7 +109,7 @@ public class CalendarFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_calendar, container, false);
 
         TextView groupName = view.findViewById(R.id.group_name);
-        groupName.setText(shiftRule.getName());
+        groupName.setText(ShiftCalendarUtil.removeHSM2Prefix(shiftRule.getName()));
 
         View groupSwitchContainer = view.findViewById(R.id.group_switch_container);
         groupSwitchContainer.setOnClickListener(v -> showGroupPopup());
@@ -85,17 +121,346 @@ public class CalendarFragment extends Fragment {
         detailShift = view.findViewById(R.id.detail_shift);
         detailOtherGroups = view.findViewById(R.id.detail_other_groups);
 
+        TextView monthTitle = view.findViewById(R.id.month_title);
+        monthTitle.setOnClickListener(v -> showDatePickerDialog());
+
+        initColors();
+
         updateCalendar(view);
 
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        registerAlarmChangedReceiver();
+        monthCache.clear();
+        View view = getView();
+        if (view != null) {
+            updateCalendar(view);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        unregisterAlarmChangedReceiver();
+    }
+
+    private void registerAlarmChangedReceiver() {
+        if (alarmChangedReceiver != null) {
+            return;
+        }
+        alarmChangedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (AlarmManager.ACTION_ALARM_CHANGED.equals(intent.getAction())) {
+                    Log.d(TAG, "收到闹钟变化广播，刷新日历视图");
+                    monthCache.clear();
+                    View view = getView();
+                    if (view != null) {
+                        updateCalendar(view);
+                    }
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(AlarmManager.ACTION_ALARM_CHANGED);
+        if (getContext() != null) {
+            getContext().registerReceiver(alarmChangedReceiver, filter);
+        }
+    }
+
+    private void unregisterAlarmChangedReceiver() {
+        if (alarmChangedReceiver != null && getContext() != null) {
+            try {
+                getContext().unregisterReceiver(alarmChangedReceiver);
+            } catch (Exception e) {
+                Log.e(TAG, "注销广播接收器失败", e);
+            }
+            alarmChangedReceiver = null;
+        }
+    }
+
+    private void showDatePickerDialog() {
+        Log.d(TAG, "显示日期选择器弹窗");
+
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_date_picker, null);
+
+        EditText etYear = dialogView.findViewById(R.id.et_year);
+        EditText etMonth = dialogView.findViewById(R.id.et_month);
+        ImageView ivYearUp = dialogView.findViewById(R.id.iv_year_up);
+        ImageView ivYearDown = dialogView.findViewById(R.id.iv_year_down);
+        ImageView ivMonthUp = dialogView.findViewById(R.id.iv_month_up);
+        ImageView ivMonthDown = dialogView.findViewById(R.id.iv_month_down);
+
+        final int startYear = 2018;
+        final int endYear = 2050;
+        int currentYear = currentCalendar.get(Calendar.YEAR);
+        int currentMonth = currentCalendar.get(Calendar.MONTH) + 1;
+
+        final int[] year = {currentYear};
+        final int[] month = {currentMonth};
+
+        etYear.setText(String.valueOf(year[0]));
+        etMonth.setText(String.format("%02d", month[0]));
+
+        ivYearUp.setOnClickListener(v -> {
+            year[0] = (year[0] + 1);
+            if (year[0] > endYear) year[0] = endYear;
+            etYear.setText(String.valueOf(year[0]));
+            clearFocusAndHideKeyboard(etYear, etMonth);
+        });
+
+        ivYearDown.setOnClickListener(v -> {
+            year[0] = (year[0] - 1);
+            if (year[0] < startYear) year[0] = startYear;
+            etYear.setText(String.valueOf(year[0]));
+            clearFocusAndHideKeyboard(etYear, etMonth);
+        });
+
+        ivMonthUp.setOnClickListener(v -> {
+            month[0] = (month[0] % 12) + 1;
+            etMonth.setText(String.format("%02d", month[0]));
+            clearFocusAndHideKeyboard(etYear, etMonth);
+        });
+
+        ivMonthDown.setOnClickListener(v -> {
+            month[0] = (month[0] - 2 + 12) % 12 + 1;
+            etMonth.setText(String.format("%02d", month[0]));
+            clearFocusAndHideKeyboard(etYear, etMonth);
+        });
+
+        final float[] lastY = {0};
+        final float[] startY = {0};
+        final boolean[] isScrolling = {false};
+        final int SCROLL_THRESHOLD = 30;
+        final long[] lastClickTime = {0};
+        final long DOUBLE_CLICK_THRESHOLD = 300;
+
+        etYear.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    etYear.setFocusable(false);
+                    etYear.setFocusableInTouchMode(false);
+                    etYear.setCursorVisible(false);
+                    startY[0] = event.getY();
+                    lastY[0] = event.getY();
+                    isScrolling[0] = false;
+                    lastClickTime[0] = System.currentTimeMillis();
+                    return false;
+                case MotionEvent.ACTION_MOVE:
+                    etYear.clearFocus();
+                    etYear.setFocusable(false);
+                    etYear.setFocusableInTouchMode(false);
+                    etYear.setCursorVisible(false);
+                    etMonth.clearFocus();
+                    etMonth.setFocusable(false);
+                    etMonth.setFocusableInTouchMode(false);
+                    etMonth.setCursorVisible(false);
+
+                    float currentY = event.getY();
+                    float deltaY = currentY - startY[0];
+                    if (Math.abs(deltaY) > SCROLL_THRESHOLD) {
+                        isScrolling[0] = true;
+                    }
+                    if (isScrolling[0]) {
+                        float moveDelta = lastY[0] - currentY;
+                        if (moveDelta > 30) {
+                            year[0] = year[0] + 1;
+                            if (year[0] > endYear) year[0] = endYear;
+                            etYear.setText(String.valueOf(year[0]));
+                            lastY[0] = currentY;
+                        } else if (moveDelta < -30) {
+                            year[0] = year[0] - 1;
+                            if (year[0] < startYear) year[0] = startYear;
+                            etYear.setText(String.valueOf(year[0]));
+                            lastY[0] = currentY;
+                        }
+                        return true;
+                    }
+                    return false;
+                case MotionEvent.ACTION_UP:
+                    if (!isScrolling[0]) {
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastClickTime[0] < DOUBLE_CLICK_THRESHOLD) {
+                            etYear.setFocusable(true);
+                            etYear.setFocusableInTouchMode(true);
+                            etYear.setCursorVisible(true);
+                            etYear.requestFocus();
+                            int length = etYear.getText().length();
+                            etYear.setSelection(0, length);
+                        }
+                    }
+                    isScrolling[0] = false;
+                    return true;
+            }
+            return false;
+        });
+
+        etMonth.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    etMonth.setFocusable(false);
+                    etMonth.setFocusableInTouchMode(false);
+                    etMonth.setCursorVisible(false);
+                    startY[0] = event.getY();
+                    lastY[0] = event.getY();
+                    isScrolling[0] = false;
+                    lastClickTime[0] = System.currentTimeMillis();
+                    return false;
+                case MotionEvent.ACTION_MOVE:
+                    etYear.clearFocus();
+                    etYear.setFocusable(false);
+                    etYear.setFocusableInTouchMode(false);
+                    etYear.setCursorVisible(false);
+                    etMonth.clearFocus();
+                    etMonth.setFocusable(false);
+                    etMonth.setFocusableInTouchMode(false);
+                    etMonth.setCursorVisible(false);
+
+                    float currentY = event.getY();
+                    float deltaY = currentY - startY[0];
+                    if (Math.abs(deltaY) > SCROLL_THRESHOLD) {
+                        isScrolling[0] = true;
+                    }
+                    if (isScrolling[0]) {
+                        float moveDelta = lastY[0] - currentY;
+                        if (moveDelta > 30) {
+                            month[0] = (month[0] % 12) + 1;
+                            etMonth.setText(String.format("%02d", month[0]));
+                            lastY[0] = currentY;
+                        } else if (moveDelta < -30) {
+                            month[0] = (month[0] - 2 + 12) % 12 + 1;
+                            etMonth.setText(String.format("%02d", month[0]));
+                            lastY[0] = currentY;
+                        }
+                        return true;
+                    }
+                    return false;
+                case MotionEvent.ACTION_UP:
+                    if (!isScrolling[0]) {
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastClickTime[0] < DOUBLE_CLICK_THRESHOLD) {
+                            etMonth.setFocusable(true);
+                            etMonth.setFocusableInTouchMode(true);
+                            etMonth.setCursorVisible(true);
+                            etMonth.requestFocus();
+                            int length = etMonth.getText().length();
+                            etMonth.setSelection(0, length);
+                        }
+                    }
+                    isScrolling[0] = false;
+                    return true;
+            }
+            return false;
+        });
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setView(dialogView);
+
+        AlertDialog dialog = builder.create();
+
+        TextView btnConfirm = dialogView.findViewById(R.id.btn_confirm);
+        btnConfirm.setOnClickListener(v -> {
+            try {
+                int selectedYear = Integer.parseInt(etYear.getText().toString());
+                int selectedMonth = Integer.parseInt(etMonth.getText().toString());
+
+                if (selectedYear < startYear) selectedYear = startYear;
+                if (selectedYear > endYear) selectedYear = endYear;
+                if (selectedMonth < 1) selectedMonth = 1;
+                if (selectedMonth > 12) selectedMonth = 12;
+
+                Log.d(TAG, "选择日期: " + selectedYear + "年" + selectedMonth + "月");
+
+                currentCalendar.set(selectedYear, selectedMonth - 1, 1);
+                lastSelectedDay = null;
+                lastSelectedView = null;
+                updateCalendar(getView());
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "日期解析错误", e);
+            }
+
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private void showAlarmPopup(ShiftDay day) {
+        Context context = getContext();
+        if (context == null || day == null) {
+            return;
+        }
+        
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle("设置闹钟");
+        builder.setMessage(day.getYear() + "年" + day.getMonth() + "月" + day.getDay() + "日");
+        
+        builder.setPositiveButton("设置", (dialog, which) -> {
+            if (getContext() == null) {
+                return;
+            }
+            
+            Calendar calendar = Calendar.getInstance();
+            int year = day.getYear();
+            int monthValue = day.getMonth();
+            int dayOfMonth = day.getDay();
+            
+            if (year < 1970 || year > 2100) {
+                year = Calendar.getInstance().get(Calendar.YEAR);
+            }
+            if (monthValue < 1 || monthValue > 12) {
+                monthValue = 1;
+            }
+            if (dayOfMonth < 1 || dayOfMonth > 31) {
+                dayOfMonth = 1;
+            }
+            
+            calendar.set(year, monthValue - 1, dayOfMonth);
+            calendar.set(Calendar.HOUR_OF_DAY, 0);
+            calendar.set(Calendar.MINUTE, 0);
+            calendar.set(Calendar.SECOND, 0);
+            calendar.set(Calendar.MILLISECOND, 0);
+            
+            Intent intent = new Intent(getContext(), DateAlarmActivity.class);
+            intent.putExtra("date", calendar.getTimeInMillis());
+            startActivity(intent);
+        });
+        
+        builder.setNegativeButton("取消", (dialog, which) -> dialog.dismiss());
+        
+        builder.show();
+    }
+
+    private void clearFocusAndHideKeyboard(EditText et1, EditText et2) {
+        et1.clearFocus();
+        et1.setFocusable(false);
+        et1.setFocusableInTouchMode(false);
+        et1.setCursorVisible(false);
+        et2.clearFocus();
+        et2.setFocusable(false);
+        et2.setFocusableInTouchMode(false);
+        et2.setCursorVisible(false);
+    }
+
+    private void initColors() {
+        holidayRestBgColor = getResources().getColor(R.color.holiday_rest_bg);
+        holidayWorkBgColor = getResources().getColor(R.color.holiday_work_bg);
+        holidayRedColor = getResources().getColor(R.color.holiday_red);
+        textSecondaryColor = getResources().getColor(R.color.text_secondary);
+        transparentColor = getResources().getColor(android.R.color.transparent);
+        todayBgColor = getResources().getColor(R.color.today_bg);
+        backgroundColor = getResources().getColor(R.color.background);
     }
 
     private void updateCalendar(View view) {
         int year = currentCalendar.get(Calendar.YEAR);
         int month = currentCalendar.get(Calendar.MONTH) + 1;
 
-        TextView monthTitle = view.findViewById(R.id.month_title);
-        monthTitle.setText(year + "年" + month + "月");
+        TextView monthTitleView = view.findViewById(R.id.month_title);
+        monthTitleView.setText(year + "年" + month + "月");
 
         Calendar today = Calendar.getInstance();
         boolean isCurrentMonth = year == today.get(Calendar.YEAR) &&
@@ -103,7 +468,15 @@ public class CalendarFragment extends Fragment {
         TextView todayText = view.findViewById(R.id.today_text);
         todayText.setVisibility(isCurrentMonth ? View.GONE : View.VISIBLE);
 
-        List<ShiftDay> days = ShiftCalendarUtil.generateMonthShiftDays(year, month, shiftRule);
+        String cacheKey = year + "-" + month;
+        List<ShiftDay> days = monthCache.get(cacheKey);
+        if (days == null) {
+            days = ShiftCalendarUtil.generateMonthShiftDays(year, month, shiftRule);
+            if (monthCache.size() > 12) {
+                monthCache.clear();
+            }
+            monthCache.put(cacheKey, days);
+        }
 
         LinearLayout calendarContainer = view.findViewById(R.id.calendar_container);
         calendarContainer.removeAllViews();
@@ -123,7 +496,7 @@ public class CalendarFragment extends Fragment {
                     View emptyView = new View(getContext());
                     LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1);
                     emptyView.setLayoutParams(emptyParams);
-                    emptyView.setBackgroundColor(getResources().getColor(R.color.background));
+                    emptyView.setBackgroundColor(backgroundColor);
                     weekRow.addView(emptyView);
                     continue;
                 }
@@ -144,25 +517,39 @@ public class CalendarFragment extends Fragment {
                 String displayText = "";
                 if (day.getHoliday() != null && !day.getHoliday().isEmpty()) {
                     displayText = day.getHoliday();
-                    lunarText.setTextColor(getResources().getColor(R.color.shift_night));
+                    lunarText.setTextColor(holidayRedColor);
                 } else if (day.getSolarTerm() != null && !day.getSolarTerm().isEmpty()) {
                     displayText = day.getSolarTerm();
-                    lunarText.setTextColor(getResources().getColor(R.color.shift_white));
+                    lunarText.setTextColor(textSecondaryColor);
                 } else if (day.getLunarDate() != null && !day.getLunarDate().isEmpty()) {
                     displayText = day.getLunarDate();
-                    lunarText.setTextColor(getResources().getColor(R.color.text_secondary));
+                    lunarText.setTextColor(textSecondaryColor);
                 }
                 lunarText.setText(displayText);
 
                 if (day.getHolidayMark() != null && !day.getHolidayMark().isEmpty()) {
                     holidayMark.setText(day.getHolidayMark());
                     holidayMark.setVisibility(View.VISIBLE);
+                    if ("休".equals(day.getHolidayMark())) {
+                        holidayMark.setBackgroundColor(holidayRestBgColor);
+                    } else if ("班".equals(day.getHolidayMark())) {
+                        holidayMark.setBackgroundColor(holidayWorkBgColor);
+                    } else {
+                        holidayMark.setBackgroundColor(transparentColor);
+                    }
                 } else {
                     holidayMark.setVisibility(View.GONE);
                 }
 
                 setShiftTextColor(shiftText, day.getShiftType());
                 shiftText.setText(getShiftDisplayName(day.getShiftType()));
+
+                ImageView ivAlarmBadge = dayView.findViewById(R.id.iv_alarm_badge);
+                if (hasCalendarAlarm(day.getYear(), day.getMonth(), day.getDay())) {
+                    ivAlarmBadge.setVisibility(View.VISIBLE);
+                } else {
+                    ivAlarmBadge.setVisibility(View.GONE);
+                }
 
                 boolean isToday = day.getYear() == today.get(Calendar.YEAR) &&
                         day.getMonth() == today.get(Calendar.MONTH) + 1 &&
@@ -171,7 +558,7 @@ public class CalendarFragment extends Fragment {
                 boolean isDayInCurrentMonth = day.getMonth() == month;
 
                 if (isToday) {
-                    dayView.setBackgroundColor(getResources().getColor(R.color.today_bg));
+                    dayView.setBackgroundColor(todayBgColor);
                 }
 
                 if (!isDayInCurrentMonth) {
@@ -194,6 +581,21 @@ public class CalendarFragment extends Fragment {
                 }
 
                 dayView.setOnClickListener(v -> {
+                    if (hasCalendarAlarm(day.getYear(), day.getMonth(), day.getDay())) {
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastClickTime < 300) {
+                            AlarmSetting alarm = getCalendarAlarmForDate(day.getYear(), day.getMonth(), day.getDay());
+                            if (alarm != null) {
+                                Intent intent = new Intent(getContext(), DateAlarmActivity.class);
+                                intent.putExtra("alarm", alarm);
+                                startActivity(intent);
+                            }
+                            lastClickTime = 0;
+                            return;
+                        }
+                        lastClickTime = currentTime;
+                    }
+                    
                     if (lastSelectedView != null) {
                         View prevSelectedBg = lastSelectedView.findViewById(R.id.selected_bg);
                         prevSelectedBg.setVisibility(View.GONE);
@@ -202,6 +604,11 @@ public class CalendarFragment extends Fragment {
                     lastSelectedView = dayView;
                     lastSelectedDay = day;
                     updateDetailInfo(day);
+                });
+
+                dayView.setOnLongClickListener(v -> {
+                    showAlarmPopup(day);
+                    return true;
                 });
 
                 weekRow.addView(dayView);
@@ -217,8 +624,8 @@ public class CalendarFragment extends Fragment {
         String lunarMonth = day.getLunarMonth() != null ? day.getLunarMonth() : "";
 
         detailDate.setText(day.getYear() + "年" + String.format("%02d", day.getMonth()) + "月" + String.format("%02d", day.getDay()) + "日 " + weekDay + " 农历 " + lunarMonth + lunarDate);
-        detailShift.setText("★ 当前班次：" + shiftRule.getName() + " " + day.getShiftType());
-        detailOtherGroups.setText(getOtherGroupsShift(day.getShiftType()));
+        detailShift.setText("★ 当前班次：" + ShiftCalendarUtil.removeHSM2Prefix(shiftRule.getName()) + " " + day.getShiftType());
+        detailOtherGroups.setText(getOtherGroupsShift(day));
     }
 
     private String getWeekDay(int year, int month, int day) {
@@ -263,73 +670,33 @@ public class CalendarFragment extends Fragment {
         }
     }
 
-    private String getOtherGroupsShift(String currentShift) {
-        String[] allGroups = {"丁班", "丙班", "乙班", "甲班"};
-        String[] shifts = {ShiftCalendarUtil.SHIFT_WHITE, ShiftCalendarUtil.SHIFT_NIGHT, ShiftCalendarUtil.SHIFT_EVENING, ShiftCalendarUtil.SHIFT_REST};
-
-        int currentShiftIndex = -1;
-        for (int i = 0; i < shifts.length; i++) {
-            if (shifts[i].equals(currentShift)) {
-                currentShiftIndex = i;
-                break;
-            }
-        }
-
-        int currentGroupIndex = -1;
-        for (int i = 0; i < allGroups.length; i++) {
-            if (allGroups[i].equals(shiftRule.getName())) {
-                currentGroupIndex = i;
-                break;
-            }
-        }
-
-        String[] displayOrder;
-        switch (shiftRule.getName()) {
-            case "丁班":
-                displayOrder = new String[]{"甲班", "乙班", "丙班"};
-                break;
-            case "甲班":
-                displayOrder = new String[]{"乙班", "丙班", "丁班"};
-                break;
-            case "乙班":
-                displayOrder = new String[]{"甲班", "丙班", "丁班"};
-                break;
-            case "丙班":
-                displayOrder = new String[]{"甲班", "乙班", "丁班"};
-                break;
-            default:
-                displayOrder = new String[]{"甲班", "乙班", "丙班"};
+    private String getOtherGroupsShift(ShiftDay selectedDay) {
+        if (sameCompanyRules.size() <= 1) {
+            return "";
         }
 
         StringBuilder result = new StringBuilder();
-        for (String group : displayOrder) {
-            int groupIndex = -1;
-            for (int i = 0; i < allGroups.length; i++) {
-                if (allGroups[i].equals(group)) {
-                    groupIndex = i;
-                    break;
-                }
+        for (ShiftRule rule : sameCompanyRules) {
+            if (rule.getName().equals(shiftRule.getName())) {
+                continue;
             }
-            int shiftIndex = (currentShiftIndex - groupIndex + currentGroupIndex + shifts.length) % shifts.length;
+            String shiftType = ShiftCalendarUtil.getShiftType(rule, selectedDay.getYear(), selectedDay.getMonth(), selectedDay.getDay());
             if (result.length() > 0) result.append(" ");
-            result.append(group).append("(").append(getShiftDisplayName(shifts[shiftIndex])).append(")");
+            result.append(ShiftCalendarUtil.removeHSM2Prefix(rule.getName())).append("(").append(getShiftDisplayName(shiftType)).append(")");
         }
         return result.toString();
     }
 
     private void showGroupPopup() {
-        String[] allGroups = {"甲班", "乙班", "丙班", "丁班"};
-        String currentGroup = shiftRule.getName();
-
-        List<String> groupList = new ArrayList<>();
-        groupList.add(currentGroup);
-        for (String group : allGroups) {
-            if (!group.equals(currentGroup)) {
-                groupList.add(group);
+        List<String> groupNameList = new ArrayList<>();
+        groupNameList.add(shiftRule.getName());
+        for (ShiftRule rule : sameCompanyRules) {
+            if (!rule.getName().equals(shiftRule.getName())) {
+                groupNameList.add(rule.getName());
             }
         }
 
-        final String[] groupsArray = groupList.toArray(new String[0]);
+        final String[] groupsArray = groupNameList.toArray(new String[0]);
         final int currentGroupPosition = 0;
 
         ListView listView = new ListView(getContext());
@@ -341,12 +708,25 @@ public class CalendarFragment extends Fragment {
                 getContext(),
                 R.layout.item_group_spinner,
                 android.R.id.text1,
-                groupsArray
-        ) {
+                groupsArray) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
                 TextView textView = view.findViewById(android.R.id.text1);
+                textView.setText(ShiftCalendarUtil.removeHSM2Prefix(getItem(position)));
+                if (position == currentGroupPosition) {
+                    textView.setTextColor(getResources().getColor(R.color.primary));
+                } else {
+                    textView.setTextColor(getResources().getColor(android.R.color.black));
+                }
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                TextView textView = view.findViewById(android.R.id.text1);
+                textView.setText(ShiftCalendarUtil.removeHSM2Prefix(getItem(position)));
                 if (position == currentGroupPosition) {
                     textView.setTextColor(getResources().getColor(R.color.primary));
                 } else {
@@ -358,7 +738,7 @@ public class CalendarFragment extends Fragment {
         listView.setAdapter(adapter);
 
         TextView tempText = new TextView(getContext());
-        tempText.setText("丁班");
+        tempText.setText(ShiftCalendarUtil.removeHSM2Prefix(shiftRule.getName()));
         tempText.setTextSize(16);
         int widthSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
@@ -373,18 +753,27 @@ public class CalendarFragment extends Fragment {
                 listView,
                 popupWidth,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                true
-        );
+                true);
         popupWindow.setBackgroundDrawable(getResources().getDrawable(android.R.drawable.screen_background_light));
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
             String selectedGroup = groupsArray[position];
-            if (!selectedGroup.equals(currentGroup)) {
+            if (!selectedGroup.equals(shiftRule.getName())) {
+                ShiftRule selectedRule = null;
+                for (ShiftRule rule : sameCompanyRules) {
+                    if (rule.getName().equals(selectedGroup)) {
+                        selectedRule = rule;
+                        break;
+                    }
+                }
+                if (selectedRule == null) {
+                    selectedRule = createRuleForGroup(selectedGroup);
+                }
                 lastSelectedDay = null;
                 lastSelectedView = null;
-                shiftRule = createRuleForGroup(selectedGroup);
+                shiftRule = selectedRule;
                 TextView groupName = getView().findViewById(R.id.group_name);
-                groupName.setText(selectedGroup);
+                groupName.setText(ShiftCalendarUtil.removeHSM2Prefix(selectedGroup));
                 updateCalendar(getView());
                 if (groupSwitchListener != null) {
                     groupSwitchListener.onGroupSwitched(shiftRule);
@@ -402,6 +791,88 @@ public class CalendarFragment extends Fragment {
     private int dpToPx(int dp) {
         float density = getResources().getDisplayMetrics().density;
         return (int) (dp * density + 0.5f);
+    }
+
+    private boolean hasCalendarAlarm(int year, int month, int day) {
+        Context context = getContext();
+        if (context == null) {
+            return false;
+        }
+        
+        AlarmManager alarmManager = new AlarmManager(context);
+        List<AlarmSetting> allAlarms = alarmManager.getAllAlarms();
+        
+        Calendar targetDate = Calendar.getInstance();
+        targetDate.set(year, month - 1, day);
+        targetDate.set(Calendar.HOUR_OF_DAY, 0);
+        targetDate.set(Calendar.MINUTE, 0);
+        targetDate.set(Calendar.SECOND, 0);
+        targetDate.set(Calendar.MILLISECOND, 0);
+        long targetTime = targetDate.getTimeInMillis();
+        
+        for (AlarmSetting alarm : allAlarms) {
+            if ("日历闹钟".equals(alarm.getShiftType())) {
+                long repeatDate = alarm.getRepeatDate();
+                if (repeatDate > 0) {
+                    Calendar alarmDate = Calendar.getInstance();
+                    alarmDate.setTimeInMillis(repeatDate);
+                    alarmDate.set(Calendar.HOUR_OF_DAY, 0);
+                    alarmDate.set(Calendar.MINUTE, 0);
+                    alarmDate.set(Calendar.SECOND, 0);
+                    alarmDate.set(Calendar.MILLISECOND, 0);
+                    
+                    if (alarmDate.getTimeInMillis() == targetTime) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    private AlarmSetting getCalendarAlarmForDate(int year, int month, int day) {
+        Context context = getContext();
+        if (context == null) {
+            return null;
+        }
+        
+        AlarmManager alarmManager = new AlarmManager(context);
+        List<AlarmSetting> allAlarms = alarmManager.getAllAlarms();
+        
+        Calendar targetDate = Calendar.getInstance();
+        targetDate.set(year, month - 1, day);
+        targetDate.set(Calendar.HOUR_OF_DAY, 0);
+        targetDate.set(Calendar.MINUTE, 0);
+        targetDate.set(Calendar.SECOND, 0);
+        targetDate.set(Calendar.MILLISECOND, 0);
+        long targetTime = targetDate.getTimeInMillis();
+        
+        for (AlarmSetting alarm : allAlarms) {
+            if ("日历闹钟".equals(alarm.getShiftType())) {
+                long repeatDate = alarm.getRepeatDate();
+                if (repeatDate > 0) {
+                    Calendar alarmDate = Calendar.getInstance();
+                    alarmDate.setTimeInMillis(repeatDate);
+                    alarmDate.set(Calendar.HOUR_OF_DAY, 0);
+                    alarmDate.set(Calendar.MINUTE, 0);
+                    alarmDate.set(Calendar.SECOND, 0);
+                    alarmDate.set(Calendar.MILLISECOND, 0);
+                    
+                    if (alarmDate.getTimeInMillis() == targetTime) {
+                        return alarm;
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    public void updateShiftRule(ShiftRule newRule) {
+        this.shiftRule = newRule;
+        monthCache.clear();
+        updateCalendar(getView());
     }
 
     public void updateCalendarByDate(int year, int month) {

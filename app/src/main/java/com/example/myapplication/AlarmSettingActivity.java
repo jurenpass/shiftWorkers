@@ -2,6 +2,7 @@ package com.example.myapplication;
 
 import android.content.Intent;
 import android.os.Bundle;
+import java.util.Calendar;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.TextWatcher;
@@ -25,7 +26,7 @@ public class AlarmSettingActivity extends AppCompatActivity {
 
     private EditText etHour, etMinute;
     private TextView tvRingtone;
-    private int hour = 7, minute = 30;
+    private int hour, minute;
     private String shiftType = "白班";
     private String reminderType = "上班";
     private String ringtone = "default";
@@ -47,6 +48,10 @@ public class AlarmSettingActivity extends AppCompatActivity {
         setContentView(R.layout.activity_alarm_setting);
 
         alarmManager = new AlarmManager(this);
+
+        Calendar now = Calendar.getInstance();
+        hour = now.get(Calendar.HOUR_OF_DAY);
+        minute = now.get(Calendar.MINUTE);
 
         etHour = findViewById(R.id.et_hour);
         etMinute = findViewById(R.id.et_minute);

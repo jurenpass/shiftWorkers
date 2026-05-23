@@ -17,10 +17,22 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|left"
-        android:paddingLeft="2dp"
+        android:paddingLeft="3dp"
+        android:paddingRight="3dp"
         android:paddingTop="1dp"
+        android:paddingBottom="1dp"
         android:textSize="10sp"
-        android:textColor="#FF4444"
+        android:textColor="#FFFFFF"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/iv_alarm_badge"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_gravity="top|right"
+        android:layout_marginTop="2dp"
+        android:layout_marginRight="2dp"
+        android:src="@drawable/ic_alarm_badge"
         android:visibility="gone" />
 
     <LinearLayout

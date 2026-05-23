@@ -22,25 +22,34 @@ public class AlarmReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Log.d(TAG, "========== 闹钟触发了！==========");
 
+        AlarmManager alarmManager = new AlarmManager(context);
+
+        if (!alarmManager.isAlarmServiceEnabled()) {
+            Log.d(TAG, "闹钟服务已关闭，忽略闹钟触发");
+            return;
+        }
+
         String alarmId = intent.getStringExtra("alarmId");
 
         Log.d(TAG, "收到参数: alarmId=" + alarmId);
 
         if (alarmId != null && !alarmId.isEmpty()) {
-            AlarmManager alarmManager = new AlarmManager(context);
             AlarmSetting alarm = alarmManager.getAlarmById(alarmId);
 
             if (alarm != null && alarm.isEnabled()) {
                 String todayShift = getTodayShiftType(context);
                 String alarmShift = alarm.getShiftType();
 
-                Log.d(TAG, "今天班次: " + todayShift + ", 闹钟要求班次: " + alarmShift);
+                Log.d(TAG, "今天班次: " + todayShift + ", 闹钟班次: " + alarmShift);
 
-                if (todayShift.equals(alarmShift)) {
+                if ("普通闹钟".equals(alarmShift) || "日历闹钟".equals(alarmShift)) {
+                    Log.d(TAG, "普通闹钟或日历闹钟，直接启动响铃");
+                    startAlarm(context, alarm);
+                } else if (todayShift.equals(alarmShift)) {
                     Log.d(TAG, "班次匹配，启动闹钟响铃");
                     startAlarm(context, alarm);
                 } else {
-                    Log.d(TAG, "班次不匹配，重新设置闹钟");
+                    Log.d(TAG, "班次不匹配，重新调度闹钟到下一个" + alarmShift + "日期");
                     alarmManager.scheduleAlarm(alarm);
                 }
             } else {
@@ -54,6 +63,12 @@ public class AlarmReceiver extends BroadcastReceiver {
     private void startAlarm(Context context, AlarmSetting alarm) {
         Log.d(TAG, "准备启动AlarmService: " + alarm.getShiftType() + " " + alarm.getReminderType() + " " + alarm.getHour() + ":" + alarm.getMinute());
 
+        boolean isAppInForeground = isAppInForeground(context);
+        Log.d(TAG, "响铃前APP是否在前台: " + isAppInForeground);
+        
+        SharedPreferences prefs = context.getSharedPreferences("alarm_prefs", Context.MODE_PRIVATE);
+        prefs.edit().putBoolean("app_was_in_foreground", isAppInForeground).apply();
+
         Intent serviceIntent = new Intent(context, AlarmService.class);
         serviceIntent.putExtra("alarm_id", alarm.getId());
         serviceIntent.putExtra("shift_type", alarm.getShiftType());
@@ -64,8 +79,8 @@ public class AlarmReceiver extends BroadcastReceiver {
         serviceIntent.putExtra("vibrate", alarm.isVibrate());
         serviceIntent.putExtra("fade", alarm.isFade());
 
-        Log.d(TAG, "发送参数: alarm_id=" + alarm.getId() + ", shift_type=" + alarm.getShiftType() + 
-              ", reminder_type=" + alarm.getReminderType() + ", hour=" + alarm.getHour() + 
+        Log.d(TAG, "发送参数: alarm_id=" + alarm.getId() + ", shift_type=" + alarm.getShiftType() +
+              ", reminder_type=" + alarm.getReminderType() + ", hour=" + alarm.getHour() +
               ", minute=" + alarm.getMinute());
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -75,6 +90,27 @@ public class AlarmReceiver extends BroadcastReceiver {
             context.startService(serviceIntent);
             Log.d(TAG, "使用 startService 启动服务");
         }
+    }
+
+    private boolean isAppInForeground(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                android.app.ActivityManager activityManager = 
+                    (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+                if (activityManager != null) {
+                    for (android.app.ActivityManager.RunningAppProcessInfo processInfo : 
+                         activityManager.getRunningAppProcesses()) {
+                        if (processInfo.processName.equals(context.getPackageName()) &&
+                            processInfo.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "检测APP是否在前台失败", e);
+            }
+        }
+        return false;
     }
 
     private String getTodayShiftType(Context context) {
@@ -149,5 +185,23 @@ public class AlarmReceiver extends BroadcastReceiver {
             return defaultShifts[cycleIndex];
         }
         return "白班";
+    }
+
+    private String getShiftTypeForDay(Context context, Calendar alarmCal) {
+        String currentTeam = getCurrentTeam(context);
+
+        Calendar startDate = Calendar.getInstance();
+        startDate.set(2026, 3, 26);
+
+        int groupOffset = getGroupOffset(currentTeam);
+        startDate.add(Calendar.DAY_OF_MONTH, groupOffset);
+
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(alarmCal.getTimeInMillis());
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+
+        long daysFromStart = getDaysFromStart(cal.getTime(), startDate.getTime());
+        return getShiftTypeForDay(4, daysFromStart);
     }
 }

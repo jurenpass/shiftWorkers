@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.myapplication.data.ShiftRule;
 import com.example.myapplication.data.ShiftCalendarUtil;
+import com.example.myapplication.data.ShiftRuleManager;
 
 import java.util.Calendar;
 
@@ -36,8 +37,20 @@ public class HomeFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        loadCurrentRule();
+    }
+    
+    private void loadCurrentRule() {
         if (getArguments() != null) {
             shiftRule = (ShiftRule) getArguments().getSerializable(ARG_RULE);
+        }
+        
+        if (getActivity() != null && shiftRule == null) {
+            ShiftRuleManager ruleManager = ShiftRuleManager.getInstance(getActivity());
+            shiftRule = ruleManager.getCurrentRule();
+            if (shiftRule == null) {
+                shiftRule = ShiftCalendarUtil.createDefaultRule();
+            }
         }
     }
 
@@ -58,8 +71,7 @@ public class HomeFragment extends Fragment {
         });
 
         view.findViewById(R.id.btn_view_rule).setOnClickListener(v -> {
-            Intent intent = new Intent(getActivity(), RuleDetailActivity.class);
-            intent.putExtra("rule", shiftRule);
+            Intent intent = new Intent(getActivity(), ToolListActivity.class);
             startActivity(intent);
         });
 
@@ -69,7 +81,7 @@ public class HomeFragment extends Fragment {
     private void updateRuleDisplay() {
         if (shiftRule != null) {
             if (groupNameView != null) {
-                groupNameView.setText(shiftRule.getName());
+                groupNameView.setText(ShiftCalendarUtil.removeHSM2Prefix(shiftRule.getName()));
             }
             if (companyNameView != null) {
                 companyNameView.setText(shiftRule.getCompanyName());
@@ -98,6 +110,13 @@ public class HomeFragment extends Fragment {
             }
         }
         return "";
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadCurrentRule();
+        updateRuleDisplay();
     }
 
     public void updateShiftRule(ShiftRule newRule) {

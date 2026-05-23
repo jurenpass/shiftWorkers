@@ -3,39 +3,129 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@drawable/bg_dialog">
+    android:background="#FFFFFF"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="选择年月"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#333333"
+        android:gravity="center"
+        android:paddingBottom="16dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="2">
 
-        <com.example.myapplication.CustomNumberPicker
-            android:id="@+id/picker_year"
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
 
-        <com.example.myapplication.CustomNumberPicker
-            android:id="@+id/picker_month"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1" />
+            <ImageView
+                android:id="@+id/iv_year_up"
+                android:layout_width="56dp"
+                android:layout_height="48dp"
+                android:padding="12dp"
+                android:src="@drawable/ic_arrow_up" />
 
-        <com.example.myapplication.CustomNumberPicker
-            android:id="@+id/picker_day"
+            <EditText
+                android:id="@+id/et_year"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="120dp"
+                android:minHeight="100dp"
+                android:background="@drawable/bg_time_picker"
+                android:gravity="center"
+                android:text="2026"
+                android:textSize="48sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:inputType="number"
+                android:maxLength="4"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:cursorVisible="false"
+                android:padding="4dp" />
+
+            <ImageView
+                android:id="@+id/iv_year_down"
+                android:layout_width="56dp"
+                android:layout_height="48dp"
+                android:padding="12dp"
+                android:src="@drawable/ic_arrow_down" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="32dp"
+            android:layout_height="1dp" />
+
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <ImageView
+                android:id="@+id/iv_month_up"
+                android:layout_width="56dp"
+                android:layout_height="48dp"
+                android:padding="12dp"
+                android:src="@drawable/ic_arrow_up" />
+
+            <EditText
+                android:id="@+id/et_month"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="120dp"
+                android:minHeight="100dp"
+                android:background="@drawable/bg_time_picker"
+                android:gravity="center"
+                android:text="05"
+                android:textSize="48sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:inputType="number"
+                android:maxLength="2"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:cursorVisible="false"
+                android:padding="4dp" />
+
+            <ImageView
+                android:id="@+id/iv_month_down"
+                android:layout_width="56dp"
+                android:layout_height="48dp"
+                android:padding="12dp"
+                android:src="@drawable/ic_arrow_down" />
+        </LinearLayout>
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btn_confirm"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="@android:color/transparent"
-        android:text="确定"
-        android:textColor="#1E90FF"
-        android:textSize="16sp" />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="20dp"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/btn_confirm"
+            android:layout_width="180dp"
+            android:layout_height="56dp"
+            android:text="确定"
+            android:textSize="22sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@drawable/bg_picker_button_primary" />
+    </LinearLayout>
 </LinearLayout>

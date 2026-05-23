@@ -16,7 +16,9 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class AlarmManager {
@@ -25,6 +27,12 @@ public class AlarmManager {
     private static final String SHIFT_PREFS_NAME = "shift_prefs";
     private static final String PREF_CURRENT_GROUP = "current_group";
     private static final String TAG = "AlarmManager";
+    public static final String ACTION_ALARM_CHANGED = "com.example.myapplication.ALARM_CHANGED";
+
+    private static final int REPEAT_ONCE = 0;
+    private static final int REPEAT_DAILY = 1;
+    private static final int REPEAT_WEEKLY = 2;
+    private static final int REPEAT_DATE = 3;
 
     private Context context;
     private List<AlarmSetting> alarmList;
@@ -54,6 +62,9 @@ public class AlarmManager {
                 alarm.setRingtone(obj.optString("ringtone", "default"));
                 alarm.setVibrate(obj.optBoolean("vibrate", true));
                 alarm.setFade(obj.optBoolean("fade", true));
+                alarm.setRepeatType(obj.optInt("repeatType", 0));
+                alarm.setWeekdays(obj.optString("weekdays", ""));
+                alarm.setRepeatDate(obj.optLong("repeatDate", 0));
                 alarmList.add(alarm);
             }
         } catch (JSONException e) {
@@ -76,16 +87,21 @@ public class AlarmManager {
                 obj.put("ringtone", alarm.getRingtone());
                 obj.put("vibrate", alarm.isVibrate());
                 obj.put("fade", alarm.isFade());
+                obj.put("repeatType", alarm.getRepeatType());
+                obj.put("weekdays", alarm.getWeekdays());
+                obj.put("repeatDate", alarm.getRepeatDate());
                 array.put(obj);
             } catch (JSONException e) {
                 e.printStackTrace();
             }
         }
         preferences.edit().putString(ALARMS_KEY, array.toString()).apply();
+        notifyAlarmChanged();
     }
 
-    public List<AlarmSetting> getAlarmList() {
-        return alarmList;
+    private void notifyAlarmChanged() {
+        Intent intent = new Intent(ACTION_ALARM_CHANGED);
+        context.sendBroadcast(intent);
     }
 
     public AlarmSetting getAlarmById(String id) {
@@ -97,17 +113,6 @@ public class AlarmManager {
         return null;
     }
 
-    public void deleteAlarm(String id) {
-        for (int i = 0; i < alarmList.size(); i++) {
-            if (alarmList.get(i).getId().equals(id)) {
-                cancelAlarm(alarmList.get(i));
-                alarmList.remove(i);
-                saveAlarms();
-                break;
-            }
-        }
-    }
-
     public List<AlarmSetting> getAllAlarms() {
         return alarmList;
     }
@@ -117,7 +122,7 @@ public class AlarmManager {
             if (alarm.getId().equals(id)) {
                 alarm.setEnabled(!alarm.isEnabled());
                 saveAlarms();
-                if (alarm.isEnabled()) {
+                if (alarm.isEnabled() && isAlarmServiceEnabled()) {
                     scheduleAlarm(alarm);
                 } else {
                     cancelAlarm(alarm);
@@ -127,13 +132,47 @@ public class AlarmManager {
         }
     }
 
+    private static final String PREF_ALARM_SERVICE_ENABLED = "alarm_service_enabled";
+
+    public boolean isAlarmServiceEnabled() {
+        return preferences.getBoolean(PREF_ALARM_SERVICE_ENABLED, true);
+    }
+
+    public void setAlarmServiceEnabled(boolean enabled) {
+        preferences.edit().putBoolean(PREF_ALARM_SERVICE_ENABLED, enabled).apply();
+        if (enabled) {
+            scheduleAllAlarms();
+            startPersistentAlarmService();
+        } else {
+            cancelAllAlarms();
+            AlarmNotificationHelper.cancelNextAlarmNotification(context);
+        }
+        notifyAlarmChanged();
+    }
+
+    private void startPersistentAlarmService() {
+        Intent serviceIntent = new Intent(context, com.example.myapplication.PersistentAlarmService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent);
+        } else {
+            context.startService(serviceIntent);
+        }
+        Log.d(TAG, "启动PersistentAlarmService");
+    }
+
+    public void cancelAllAlarms() {
+        for (AlarmSetting alarm : alarmList) {
+            cancelAlarm(alarm);
+        }
+    }
+
     public void addAlarm(AlarmSetting alarm) {
         if (alarm.getId() == null || alarm.getId().isEmpty()) {
             alarm.setId(UUID.randomUUID().toString());
         }
         alarmList.add(alarm);
         saveAlarms();
-        if (alarm.isEnabled()) {
+        if (alarm.isEnabled() && isAlarmServiceEnabled()) {
             scheduleAlarm(alarm);
         }
     }
@@ -143,7 +182,7 @@ public class AlarmManager {
             if (alarmList.get(i).getId().equals(alarm.getId())) {
                 alarmList.set(i, alarm);
                 saveAlarms();
-                if (alarm.isEnabled()) {
+                if (alarm.isEnabled() && isAlarmServiceEnabled()) {
                     scheduleAlarm(alarm);
                 } else {
                     cancelAlarm(alarm);
@@ -157,6 +196,18 @@ public class AlarmManager {
         alarmList.remove(alarm);
         saveAlarms();
         cancelAlarm(alarm);
+    }
+
+    public void deleteAlarm(String id) {
+        for (int i = 0; i < alarmList.size(); i++) {
+            if (alarmList.get(i).getId().equals(id)) {
+                AlarmSetting alarm = alarmList.get(i);
+                alarmList.remove(i);
+                saveAlarms();
+                cancelAlarm(alarm);
+                break;
+            }
+        }
     }
 
     private void cancelAlarm(AlarmSetting alarm) {
@@ -198,6 +249,110 @@ public class AlarmManager {
         return nextDay.getTimeInMillis();
     }
 
+    public long getNextCustomAlarmTime(AlarmSetting alarm) {
+        Calendar now = Calendar.getInstance();
+        
+        if ("日历闹钟".equals(alarm.getShiftType())) {
+            return getNextDateAlarmTime(alarm, now);
+        }
+        
+        int repeatType = alarm.getRepeatType();
+
+        switch (repeatType) {
+            case REPEAT_ONCE:
+                return getNextOnceAlarmTime(alarm, now);
+
+            case REPEAT_DAILY:
+                return getNextDailyAlarmTime(alarm, now);
+
+            case REPEAT_WEEKLY:
+                return getNextWeeklyAlarmTime(alarm, now);
+
+            case REPEAT_DATE:
+                return getNextDateAlarmTime(alarm, now);
+
+            default:
+                return getNextOnceAlarmTime(alarm, now);
+        }
+    }
+
+    private long getNextOnceAlarmTime(AlarmSetting alarm, Calendar now) {
+        Calendar alarmCal = Calendar.getInstance();
+        alarmCal.set(Calendar.HOUR_OF_DAY, alarm.getHour());
+        alarmCal.set(Calendar.MINUTE, alarm.getMinute());
+        alarmCal.set(Calendar.SECOND, 0);
+        alarmCal.set(Calendar.MILLISECOND, 0);
+
+        if (alarmCal.after(now)) {
+            return alarmCal.getTimeInMillis();
+        }
+
+        return alarmCal.getTimeInMillis() + 24 * 60 * 60 * 1000;
+    }
+
+    private long getNextDailyAlarmTime(AlarmSetting alarm, Calendar now) {
+        Calendar alarmCal = Calendar.getInstance();
+        alarmCal.set(Calendar.HOUR_OF_DAY, alarm.getHour());
+        alarmCal.set(Calendar.MINUTE, alarm.getMinute());
+        alarmCal.set(Calendar.SECOND, 0);
+        alarmCal.set(Calendar.MILLISECOND, 0);
+
+        if (alarmCal.after(now)) {
+            return alarmCal.getTimeInMillis();
+        }
+
+        alarmCal.add(Calendar.DAY_OF_MONTH, 1);
+        return alarmCal.getTimeInMillis();
+    }
+
+    private long getNextWeeklyAlarmTime(AlarmSetting alarm, Calendar now) {
+        String weekdaysStr = alarm.getWeekdays();
+        if (weekdaysStr == null || weekdaysStr.isEmpty()) {
+            return getNextDailyAlarmTime(alarm, now);
+        }
+
+        Set<Integer> weekdays = new HashSet<>();
+        for (String day : weekdaysStr.split(",")) {
+            weekdays.add(Integer.parseInt(day));
+        }
+
+        Calendar alarmCal = Calendar.getInstance();
+        alarmCal.set(Calendar.HOUR_OF_DAY, alarm.getHour());
+        alarmCal.set(Calendar.MINUTE, alarm.getMinute());
+        alarmCal.set(Calendar.SECOND, 0);
+        alarmCal.set(Calendar.MILLISECOND, 0);
+
+        for (int i = 0; i <= 7; i++) {
+            int dayOfWeek = alarmCal.get(Calendar.DAY_OF_WEEK);
+            if (weekdays.contains(dayOfWeek) && alarmCal.after(now)) {
+                return alarmCal.getTimeInMillis();
+            }
+            alarmCal.add(Calendar.DAY_OF_MONTH, 1);
+        }
+
+        return alarmCal.getTimeInMillis();
+    }
+
+    private long getNextDateAlarmTime(AlarmSetting alarm, Calendar now) {
+        long date = alarm.getRepeatDate();
+        if (date <= 0) {
+            return getNextOnceAlarmTime(alarm, now);
+        }
+
+        Calendar targetDate = Calendar.getInstance();
+        targetDate.setTimeInMillis(date);
+        targetDate.set(Calendar.HOUR_OF_DAY, alarm.getHour());
+        targetDate.set(Calendar.MINUTE, alarm.getMinute());
+        targetDate.set(Calendar.SECOND, 0);
+        targetDate.set(Calendar.MILLISECOND, 0);
+
+        if (targetDate.after(now)) {
+            return targetDate.getTimeInMillis();
+        }
+
+        return 0;
+    }
+
     public long getNextAlarmTimeForShift(AlarmSetting alarm) {
         Calendar now = Calendar.getInstance();
         Calendar startDate = Calendar.getInstance();
@@ -215,7 +370,7 @@ public class AlarmManager {
         today.set(Calendar.SECOND, 0);
         today.set(Calendar.MILLISECOND, 0);
         Log.d(TAG, "今天日期: " + today.get(Calendar.YEAR) + "-" + (today.get(Calendar.MONTH) + 1) + "-" + today.get(Calendar.DAY_OF_MONTH));
-        
+
         long todayDaysFromStart = getDaysFromStart(today.getTime(), startDate.getTime());
         Log.d(TAG, "今天距离起始日期天数: " + todayDaysFromStart);
         String todayShift = getShiftTypeForDay(4, todayDaysFromStart);
@@ -291,17 +446,17 @@ public class AlarmManager {
         currentCal.set(Calendar.MINUTE, 0);
         currentCal.set(Calendar.SECOND, 0);
         currentCal.set(Calendar.MILLISECOND, 0);
-        
+
         Calendar startCal = Calendar.getInstance();
         startCal.setTime(start);
         startCal.set(Calendar.HOUR_OF_DAY, 0);
         startCal.set(Calendar.MINUTE, 0);
         startCal.set(Calendar.SECOND, 0);
         startCal.set(Calendar.MILLISECOND, 0);
-        
+
         long diff = currentCal.getTimeInMillis() - startCal.getTimeInMillis();
         long days = diff / (1000 * 60 * 60 * 24);
-        
+
         return days;
     }
 
@@ -320,86 +475,47 @@ public class AlarmManager {
         today.set(Calendar.MINUTE, 0);
         today.set(Calendar.SECOND, 0);
         today.set(Calendar.MILLISECOND, 0);
-        long todayStart = today.getTimeInMillis();
-        long tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
-
-        AlarmSetting todayAlarm = null;
-        long todayNextTime = Long.MAX_VALUE;
-
-        for (AlarmSetting alarm : alarmList) {
-            if (!alarm.isEnabled()) continue;
-
-            long alarmTime = getNextAlarmTimeForShift(alarm);
-            if (alarmTime >= now && alarmTime < tomorrowStart && alarmTime < todayNextTime) {
-                todayNextTime = alarmTime;
-                todayAlarm = alarm;
-            }
-        }
-
-        if (todayAlarm != null) {
-            return todayAlarm;
-        }
-
-        String currentTeam = getCurrentTeam();
-        String todayShift = getTodayShiftType(currentTeam);
-        String[] shiftOrder = {"白班", "上夜班", "下夜班", "正休"};
-        int todayIndex = -1;
-        for (int i = 0; i < shiftOrder.length; i++) {
-            if (shiftOrder[i].equals(todayShift)) {
-                todayIndex = i;
-                break;
-            }
-        }
 
         AlarmSetting nextAlarm = null;
         long nextTime = Long.MAX_VALUE;
 
-        for (int offset = 0; offset < shiftOrder.length; offset++) {
-            int searchIndex = (todayIndex + 1 + offset) % shiftOrder.length;
-            String targetShift = shiftOrder[searchIndex];
-
-            for (AlarmSetting alarm : alarmList) {
-                if (!alarm.isEnabled()) continue;
-                if (!alarm.getShiftType().equals(targetShift)) continue;
-
-                long alarmTime = getNextAlarmTimeForShift(alarm);
-                if (alarmTime > now && alarmTime < nextTime) {
-                    nextTime = alarmTime;
-                    nextAlarm = alarm;
-                }
+        for (AlarmSetting alarm : alarmList) {
+            if (!alarm.isEnabled()) {
+                continue;
             }
 
-            if (nextAlarm != null) {
-                break;
+            long alarmTime;
+            if ("普通闹钟".equals(alarm.getShiftType()) || "日历闹钟".equals(alarm.getShiftType())) {
+                alarmTime = getNextCustomAlarmTime(alarm);
+            } else {
+                alarmTime = getNextAlarmTimeForShift(alarm);
+            }
+
+            if (alarmTime > 0 && alarmTime > now && alarmTime < nextTime) {
+                nextTime = alarmTime;
+                nextAlarm = alarm;
             }
         }
 
         return nextAlarm;
     }
 
-    private String getTodayShiftType(String team) {
-        Calendar startDate = Calendar.getInstance();
-        startDate.set(2026, 3, 26);
-        
-        int groupOffset = getGroupOffset(team);
-        startDate.add(Calendar.DAY_OF_MONTH, groupOffset);
-
-        Calendar today = Calendar.getInstance();
-        today.set(Calendar.HOUR_OF_DAY, 0);
-        today.set(Calendar.MINUTE, 0);
-        today.set(Calendar.SECOND, 0);
-        today.set(Calendar.MILLISECOND, 0);
-
-        long daysFromStart = getDaysFromStart(today.getTime(), startDate.getTime());
-        return getShiftTypeForDay(4, daysFromStart);
-    }
-
     public void scheduleAlarm(AlarmSetting alarm) {
         cancelAlarm(alarm);
 
-        long alarmTime = getNextAlarmTimeForShift(alarm);
-        
-        Log.d(TAG, "调度闹钟: " + alarm.getReminderType() + ", 类型: " + alarm.getShiftType() + ", 时间: " + alarmTime);
+        long alarmTime;
+        if ("普通闹钟".equals(alarm.getShiftType()) || "日历闹钟".equals(alarm.getShiftType())) {
+            alarmTime = getNextCustomAlarmTime(alarm);
+            Log.d(TAG, "调度普通/日历闹钟: " + alarm.getShiftType() + " " + alarm.getReminderType() + ", 时间: " + alarmTime);
+        } else {
+            alarmTime = getNextAlarmTimeForShift(alarm);
+            Log.d(TAG, "调度倒班闹钟: " + alarm.getReminderType() + ", 类型: " + alarm.getShiftType() + ", 时间: " + alarmTime);
+        }
+
+        if (alarmTime <= 0) {
+            Log.d(TAG, "闹钟时间无效，跳过调度: " + alarm.getShiftType() + " " + alarm.getReminderType());
+            return;
+        }
 
         android.app.AlarmManager alarmManager = (android.app.AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager != null) {

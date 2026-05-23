@@ -8,18 +8,50 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#1E90FF"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:orientation="horizontal">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="倒班闹钟"
             android:textColor="#FFFFFF"
             android:textSize="24sp"
             android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/iv_add_alarm"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_add"
+            android:layout_gravity="center_vertical" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFFF"
+        android:padding="16dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="全部闹钟"
+            android:textColor="#333333"
+            android:textSize="16sp" />
+
+        <Switch
+            android:id="@+id/switch_all_alarm"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true" />
     </LinearLayout>
 
     <FrameLayout
+        android:id="@+id/fl_alarm_content"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
@@ -53,29 +85,37 @@
                 android:textColor="#999999"
                 android:textSize="16sp" />
         </LinearLayout>
-    </FrameLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#FFFFFF"
-        android:padding="16dp">
 
         <LinearLayout
-            android:id="@+id/btn_add_alarm"
+            android:id="@+id/service_disabled_view"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#1E90FF"
+            android:layout_height="match_parent"
+            android:background="#F5F5F5"
             android:gravity="center"
-            android:padding="16dp">
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:src="@drawable/ic_alarm_clock" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="添加闹钟"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="16dp"
+                android:text="闹钟服务已关闭"
+                android:textColor="#999999"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="请开启全部闹钟开关以使用闹钟功能"
+                android:textColor="#CCCCCC"
+                android:textSize="14sp" />
         </LinearLayout>
+    </FrameLayout>
+
     </LinearLayout>
-</LinearLayout>

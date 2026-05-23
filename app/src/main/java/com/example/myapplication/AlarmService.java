@@ -7,9 +7,11 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
@@ -28,7 +30,7 @@ public class AlarmService extends Service {
 
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
+                PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
                 "AlarmService:WakeLock"
         );
         wakeLock.acquire(60000);
@@ -48,32 +50,38 @@ public class AlarmService extends Service {
             int hour = intent.getIntExtra("hour", -1);
             int minute = intent.getIntExtra("minute", -1);
 
-            Log.d(TAG, "收到闹钟信号: alarmId=" + alarmId + ", " + shiftType + " " + reminderType + " " + hour + ":" + minute);
+            Log.d(TAG, "收到闹钟信号: alarmId=" + alarmId + ", " + shiftType + " " + reminderType + " " + String.format("%02d:%02d", hour, minute));
 
             if (shiftType != null && reminderType != null && hour >= 0 && minute >= 0) {
                 startAlarmActivity(alarmId, shiftType, reminderType, String.valueOf(hour), String.valueOf(minute));
             } else {
                 Log.d(TAG, "缺少闹钟参数，不启动AlarmActivity");
+                stopSelf();
             }
         } else {
             Log.d(TAG, "intent为null，不启动AlarmActivity");
+            stopSelf();
         }
 
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
         Log.d(TAG, "AlarmService 任务被移除");
+        stopSelf();
     }
 
     private void startAlarmActivity(String alarmId, String shiftType, String reminderType, String hour, String minute) {
+        SharedPreferences prefs = getSharedPreferences("alarm_closed", MODE_PRIVATE);
+        prefs.edit().putBoolean("is_alarm_closed", false).apply();
+        Log.d(TAG, "闹钟关闭状态已重置");
+        
         Intent alarmIntent = new Intent(this, AlarmActivity.class);
         alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
-                Intent.FLAG_ACTIVITY_CLEAR_TASK |
-                Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS |
-                Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+                Intent.FLAG_ACTIVITY_NO_USER_ACTION |
+                Intent.FLAG_ACTIVITY_TASK_ON_HOME);
         alarmIntent.putExtra("alarm_id", alarmId);
         alarmIntent.putExtra("shift_type", shiftType);
         alarmIntent.putExtra("reminder_type", reminderType);
@@ -83,9 +91,20 @@ public class AlarmService extends Service {
         try {
             startActivity(alarmIntent);
             Log.d(TAG, "AlarmActivity 启动成功");
+            
+            new Handler().postDelayed(() -> {
+                stopSelf();
+                Log.d(TAG, "AlarmService 启动Activity后停止");
+            }, 1000);
+            
         } catch (Exception e) {
             Log.e(TAG, "AlarmActivity 启动失败，尝试显示高优先级通知", e);
             showHighPriorityNotification(alarmId, shiftType, reminderType, hour, minute);
+            
+            new Handler().postDelayed(() -> {
+                stopSelf();
+                Log.d(TAG, "AlarmService 显示通知后停止");
+            }, 1000);
         }
     }
 
@@ -94,10 +113,11 @@ public class AlarmService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "闹钟服务",
-                    NotificationManager.IMPORTANCE_MIN
+                    NotificationManager.IMPORTANCE_LOW
             );
             channel.setDescription("倒班闹钟服务");
             channel.setSound(null, null);
+            channel.setShowBadge(false);
 
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             if (notificationManager != null) {

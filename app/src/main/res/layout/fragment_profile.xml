@@ -50,9 +50,11 @@
                     android:layout_height="wrap_content"
                     android:text="用户昵称"
                     android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:textColor="#333333" />
 
                 <TextView
+                    android:id="@+id/tv_team_member"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
@@ -95,7 +97,8 @@
                 android:layout_marginLeft="12dp"
                 android:layout_weight="1"
                 android:text="设置"
-                android:textSize="16sp" />
+                android:textSize="16sp"
+                android:textColor="#333333" />
 
             <ImageView
                 android:layout_width="24dp"
@@ -126,7 +129,8 @@
                 android:layout_marginLeft="12dp"
                 android:layout_weight="1"
                 android:text="帮助与反馈"
-                android:textSize="16sp" />
+                android:textSize="16sp"
+                android:textColor="#333333" />
 
             <ImageView
                 android:layout_width="24dp"
@@ -156,8 +160,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="12dp"
                 android:layout_weight="1"
-                android:text="关于我们"
-                android:textSize="16sp" />
+                android:text="关于"
+                android:textSize="16sp"
+                android:textColor="#333333" />
 
             <ImageView
                 android:layout_width="24dp"

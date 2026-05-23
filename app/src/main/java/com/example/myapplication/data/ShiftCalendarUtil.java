@@ -1,5 +1,7 @@
 package com.example.myapplication.data;
 
+import android.content.Context;
+
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -114,12 +116,20 @@ public class ShiftCalendarUtil {
 
         Calendar startDate = Calendar.getInstance();
         startDate.set(2026, 3, 26);
+        startDate.set(Calendar.HOUR_OF_DAY, 0);
+        startDate.set(Calendar.MINUTE, 0);
+        startDate.set(Calendar.SECOND, 0);
+        startDate.set(Calendar.MILLISECOND, 0);
 
-        int groupOffset = getGroupOffset(rule.getName());
+        int groupOffset = getGroupOffset(rule.getName(), rule);
         startDate.add(Calendar.DAY_OF_MONTH, groupOffset);
 
         Calendar current = Calendar.getInstance();
         current.set(year, month - 1, 1);
+        current.set(Calendar.HOUR_OF_DAY, 0);
+        current.set(Calendar.MINUTE, 0);
+        current.set(Calendar.SECOND, 0);
+        current.set(Calendar.MILLISECOND, 0);
         
         int offset = firstDayOfWeek - 2;
         if (offset < 0) {
@@ -155,14 +165,33 @@ public class ShiftCalendarUtil {
         return days;
     }
     
-    private static int getGroupOffset(String groupName) {
-        switch (groupName) {
-            case "丁班": return 0;
-            case "丙班": return 1;
-            case "乙班": return 2;
-            case "甲班": return 3;
-            default: return 0;
+    public static int getGroupOffset(String groupName, ShiftRule rule) {
+        List<ShiftRule> sameCompanyRules = new ArrayList<>();
+        if (rule != null) {
+            ShiftRuleManager manager = null;
+            try {
+                manager = ShiftRuleManager.getInstance(null);
+                sameCompanyRules = manager.getRulesByCompany(rule.getCompanyName());
+            } catch (Exception e) {
+            }
         }
+        
+        if (sameCompanyRules.isEmpty()) {
+            switch (groupName) {
+                case "丁班": return 0;
+                case "丙班": return 1;
+                case "乙班": return 2;
+                case "甲班": return 3;
+                default: return 0;
+            }
+        }
+        
+        for (int i = 0; i < sameCompanyRules.size(); i++) {
+            if (sameCompanyRules.get(i).getName().equals(groupName)) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     private static ShiftDay createShiftDay(Calendar calendar, ShiftRule rule, Calendar startDate) {
@@ -178,16 +207,37 @@ public class ShiftCalendarUtil {
     }
 
     private static long getDaysFromStart(Date current, Date start) {
-        return (current.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+        Calendar currentCal = Calendar.getInstance();
+        currentCal.setTime(current);
+        Calendar startCal = Calendar.getInstance();
+        startCal.setTime(start);
+        
+        // 确保时间部分为0，避免计算错误
+        currentCal.set(Calendar.HOUR_OF_DAY, 0);
+        currentCal.set(Calendar.MINUTE, 0);
+        currentCal.set(Calendar.SECOND, 0);
+        currentCal.set(Calendar.MILLISECOND, 0);
+        startCal.set(Calendar.HOUR_OF_DAY, 0);
+        startCal.set(Calendar.MINUTE, 0);
+        startCal.set(Calendar.SECOND, 0);
+        startCal.set(Calendar.MILLISECOND, 0);
+        
+        // 使用 Calendar 计算天数差
+        long currentTime = currentCal.getTimeInMillis();
+        long startTime = startCal.getTimeInMillis();
+        
+        return (currentTime - startTime) / (1000 * 60 * 60 * 24);
     }
 
     private static String getShiftTypeForDay(ShiftRule rule, long daysFromStart) {
         if (rule == null || rule.getShiftDetails() == null || rule.getShiftDetails().isEmpty()) {
             return SHIFT_WHITE;
         }
-        int cycleIndex = (int) (daysFromStart % rule.getCycleDays());
+        int cycleDays = rule.getCycleDays();
+        // 处理负数天数：使用标准的模运算方式
+        int cycleIndex = (int) (daysFromStart % cycleDays);
         if (cycleIndex < 0) {
-            cycleIndex += rule.getCycleDays();
+            cycleIndex += cycleDays;
         }
         if (cycleIndex < rule.getShiftDetails().size()) {
             return rule.getShiftDetails().get(cycleIndex).getShiftName();
@@ -308,6 +358,11 @@ public class ShiftCalendarUtil {
         return "未知班组";
     }
 
+    public static String removeHSM2Prefix(String name) {
+        if (name == null) return null;
+        return name.replaceFirst("^HSM2-", "");
+    }
+
     public static String getTodayShiftType(ShiftRule rule) {
         if (rule == null) {
             return SHIFT_WHITE;
@@ -320,7 +375,7 @@ public class ShiftCalendarUtil {
         startDate.set(Calendar.SECOND, 0);
         startDate.set(Calendar.MILLISECOND, 0);
         
-        int groupOffset = getGroupOffset(rule.getName());
+        int groupOffset = getGroupOffset(rule.getName(), rule);
         startDate.add(Calendar.DAY_OF_MONTH, groupOffset);
 
         Calendar today = Calendar.getInstance();
@@ -350,5 +405,41 @@ public class ShiftCalendarUtil {
         rule.setShiftDetails(details);
 
         return rule;
+    }
+    
+    public static List<ShiftRule> getSameCompanyRules(Context context, ShiftRule rule) {
+        if (rule == null) return new ArrayList<>();
+        try {
+            ShiftRuleManager manager = ShiftRuleManager.getInstance(context);
+            return manager.getRulesByCompany(rule.getCompanyName());
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+    
+    public static String getShiftType(ShiftRule rule, int year, int month, int day) {
+        if (rule == null) {
+            return SHIFT_WHITE;
+        }
+        
+        Calendar startDate = Calendar.getInstance();
+        startDate.set(2026, 3, 26);
+        startDate.set(Calendar.HOUR_OF_DAY, 0);
+        startDate.set(Calendar.MINUTE, 0);
+        startDate.set(Calendar.SECOND, 0);
+        startDate.set(Calendar.MILLISECOND, 0);
+        
+        int groupOffset = getGroupOffset(rule.getName(), rule);
+        startDate.add(Calendar.DAY_OF_MONTH, groupOffset);
+
+        Calendar targetDate = Calendar.getInstance();
+        targetDate.set(year, month - 1, day);
+        targetDate.set(Calendar.HOUR_OF_DAY, 0);
+        targetDate.set(Calendar.MINUTE, 0);
+        targetDate.set(Calendar.SECOND, 0);
+        targetDate.set(Calendar.MILLISECOND, 0);
+
+        long daysFromStart = getDaysFromStart(targetDate.getTime(), startDate.getTime());
+        return getShiftTypeForDay(rule, daysFromStart);
     }
 }

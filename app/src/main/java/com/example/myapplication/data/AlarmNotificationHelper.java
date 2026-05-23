@@ -64,7 +64,12 @@ public class AlarmNotificationHelper {
         );
 
         AlarmManager alarmManager = new AlarmManager(context);
-        long nextAlarmTime = alarmManager.getNextAlarmTimeForShift(alarm);
+        long nextAlarmTime;
+        if ("普通闹钟".equals(alarm.getShiftType()) || "日历闹钟".equals(alarm.getShiftType())) {
+            nextAlarmTime = alarmManager.getNextCustomAlarmTime(alarm);
+        } else {
+            nextAlarmTime = alarmManager.getNextAlarmTimeForShift(alarm);
+        }
         String relativeDate = getRelativeDateString(nextAlarmTime);
 
         Calendar alarmCal = Calendar.getInstance();

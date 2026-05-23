@@ -1,193 +1,133 @@
 package com.example.myapplication;
 
 import android.content.Context;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
+import android.graphics.drawable.ColorDrawable;
 import android.util.AttributeSet;
-import android.util.TypedValue;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.NumberPicker;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.lang.reflect.Field;
 
-public class CustomNumberPicker extends View {
-    private List<Integer> values = new ArrayList<>();
-    private int selectedIndex = 0;
-    private float scrollY = 0;
-    private float lastTouchY = 0;
-    
-    private Paint textPaint;
-    private Paint dividerPaint;
-    private Paint selectedTextPaint;
-    
-    private int itemHeight = 200;
-    private int visibleCount = 3;
-    private float textSizeNormal;
-    private float textSizeSelected;
-    private boolean wrapEnabled = false;
-    
+public class CustomNumberPicker extends NumberPicker {
+
+    private GestureDetector mGestureDetector;
+    private EditText mEditText;
+    private int mMinValue;
+    private int mMaxValue;
+
     public CustomNumberPicker(Context context) {
         super(context);
         init(context);
     }
-    
+
     public CustomNumberPicker(Context context, AttributeSet attrs) {
         super(context, attrs);
         init(context);
     }
-    
+
     public CustomNumberPicker(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init(context);
     }
-    
+
     private void init(Context context) {
-        textSizeNormal = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 28, 
-                context.getResources().getDisplayMetrics());
-        textSizeSelected = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 36, 
-                context.getResources().getDisplayMetrics());
-        
-        textPaint = new Paint();
-        textPaint.setTextSize(textSizeNormal);
-        textPaint.setColor(Color.parseColor("#999999"));
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        
-        selectedTextPaint = new Paint();
-        selectedTextPaint.setTextSize(textSizeSelected);
-        selectedTextPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        selectedTextPaint.setColor(Color.parseColor("#333333"));
-        selectedTextPaint.setTextAlign(Paint.Align.CENTER);
-        
-        dividerPaint = new Paint();
-        dividerPaint.setColor(Color.parseColor("#1E90FF"));
-        dividerPaint.setStrokeWidth(6f);
-        
-        setFocusable(true);
-        setFocusableInTouchMode(true);
+        setDividerColor();
     }
-    
-    public void setWrapEnabled(boolean enabled) {
-        this.wrapEnabled = enabled;
-    }
-    
-    public void setMinValue(int min) {
-        values.clear();
-        int max = values.isEmpty() ? min + 20 : values.get(values.size() - 1);
-        for (int i = min; i <= max; i++) {
-            values.add(i);
-        }
-        selectedIndex = values.size() / 2;
-        invalidate();
-    }
-    
-    public void setMaxValue(int max) {
-        int min = values.isEmpty() ? max - 20 : values.get(0);
-        values.clear();
-        for (int i = min; i <= max; i++) {
-            values.add(i);
-        }
-        selectedIndex = values.size() / 2;
-        invalidate();
-    }
-    
-    public void setValue(int value) {
-        for (int i = 0; i < values.size(); i++) {
-            if (values.get(i) == value) {
-                selectedIndex = i;
-                scrollY = 0;
-                invalidate();
-                return;
+
+    private void activateEditMode() {
+        if (mEditText != null) {
+            mEditText.setFocusable(true);
+            mEditText.setFocusableInTouchMode(true);
+            mEditText.setRawInputType(android.text.InputType.TYPE_CLASS_PHONE);
+            mEditText.requestFocus();
+            mEditText.selectAll();
+
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(mEditText, InputMethodManager.SHOW_FORCED);
             }
         }
-        if (!values.isEmpty()) {
-            selectedIndex = 0;
-            invalidate();
+    }
+
+    @Override
+    public void setMinValue(int minValue) {
+        super.setMinValue(minValue);
+        mMinValue = minValue;
+    }
+
+    @Override
+    public void setMaxValue(int maxValue) {
+        super.setMaxValue(maxValue);
+        mMaxValue = maxValue;
+    }
+
+    private void setDividerColor() {
+        try {
+            Field field = NumberPicker.class.getDeclaredField("mSelectionDivider");
+            field.setAccessible(true);
+            field.set(this, new ColorDrawable(Color.parseColor("#1E90FF")));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Field field = NumberPicker.class.getDeclaredField("mSelectionDividersDistance");
+            field.setAccessible(true);
+            field.set(this, 36);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
-    
-    public int getValue() {
-        if (values.isEmpty()) return 1;
-        return values.get(selectedIndex);
-    }
-    
+
     @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int height = itemHeight * visibleCount;
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), height);
-    }
-    
-    @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-        
-        int width = getWidth();
-        int height = getHeight();
-        int centerY = height / 2;
-        
-        canvas.drawLine(0, centerY - itemHeight / 2, width, centerY - itemHeight / 2, dividerPaint);
-        canvas.drawLine(0, centerY + itemHeight / 2, width, centerY + itemHeight / 2, dividerPaint);
-        
-        int firstVisibleIndex = selectedIndex - 1;
-        int lastVisibleIndex = selectedIndex + 1;
-        
-        for (int i = firstVisibleIndex; i <= lastVisibleIndex; i++) {
-            int actualIndex = i;
-            if (wrapEnabled && !values.isEmpty()) {
-                while (actualIndex < 0) {
-                    actualIndex += values.size();
+    public void addView(android.view.View child, int index, android.view.ViewGroup.LayoutParams params) {
+        super.addView(child, index, params);
+        if (child instanceof EditText) {
+            mEditText = (EditText) child;
+            mEditText.setTextSize(28);
+            mEditText.setTextColor(Color.parseColor("#333333"));
+            mEditText.setTypeface(null, android.graphics.Typeface.BOLD);
+            mEditText.setSelectAllOnFocus(true);
+            mEditText.setRawInputType(android.text.InputType.TYPE_CLASS_PHONE);
+
+            mGestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
+                @Override
+                public boolean onDoubleTap(MotionEvent e) {
+                    activateEditMode();
+                    return true;
                 }
-                actualIndex = actualIndex % values.size();
+            });
+
+            mEditText.setOnTouchListener((v, event) -> {
+                mGestureDetector.onTouchEvent(event);
+                return false;
+            });
+
+            mEditText.setOnEditorActionListener((v, actionId, event) -> {
+                validateAndSetValue();
+                return true;
+            });
+        }
+    }
+
+    private void validateAndSetValue() {
+        if (mEditText == null) return;
+
+        try {
+            int inputValue = Integer.parseInt(mEditText.getText().toString());
+            int correctedValue = Math.max(mMinValue, Math.min(mMaxValue, inputValue));
+            setValue(correctedValue);
+
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(mEditText.getWindowToken(), 0);
             }
-            
-            if (actualIndex < 0 || actualIndex >= values.size()) continue;
-            
-            int y = centerY + (i - selectedIndex) * itemHeight;
-            float alpha = 1.0f - Math.abs(i - selectedIndex) * 0.3f;
-            
-            Paint paint = (i == selectedIndex) ? selectedTextPaint : textPaint;
-            paint.setAlpha((int) (255 * alpha));
-            
-            canvas.drawText(String.valueOf(values.get(actualIndex)), width / 2, y + paint.getTextSize() / 2, paint);
+        } catch (NumberFormatException e) {
         }
-    }
-    
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-                lastTouchY = event.getY();
-                return true;
-            case MotionEvent.ACTION_MOVE:
-                float deltaY = event.getY() - lastTouchY;
-                scrollY += deltaY;
-                
-                if (Math.abs(scrollY) > itemHeight / 3) {
-                    if (scrollY > 0) {
-                        if (selectedIndex > 0) {
-                            selectedIndex--;
-                        } else if (wrapEnabled && !values.isEmpty()) {
-                            selectedIndex = values.size() - 1;
-                        }
-                    } else {
-                        if (selectedIndex < values.size() - 1) {
-                            selectedIndex++;
-                        } else if (wrapEnabled && !values.isEmpty()) {
-                            selectedIndex = 0;
-                        }
-                    }
-                    scrollY = 0;
-                    invalidate();
-                }
-                
-                lastTouchY = event.getY();
-                return true;
-            case MotionEvent.ACTION_UP:
-                scrollY = 0;
-                invalidate();
-                return true;
-        }
-        return super.onTouchEvent(event);
     }
 }
